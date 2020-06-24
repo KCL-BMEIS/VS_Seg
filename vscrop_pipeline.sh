@@ -3,8 +3,7 @@
 pip install git+https://github.com/Project-MONAI/MONAI.git@eb104391d18e7c8325d9e3efd5b56f7c2f7fad4a
 pip install natsort
 
-PROJECT_PATH="/workspace/home/projects/VS_Segmentation"
-MODEL_PATH="/workspace/home/projects/VS_Segmentation/best_metric_model.pth"
+PROJECT_PATH="/workspace/home/projects/VS_Seg"
 RESUlTS_FOLDER_NAME="BatchSize4"
 
 cd $PROJECT_PATH
