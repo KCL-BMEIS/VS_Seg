@@ -9,10 +9,11 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import monai
 from monai.transforms import \
-    Compose, LoadNiftid, AddChanneld, Spacingd, SpatialPadd, CenterSpatialCropd, NormalizeIntensityd, Orientationd, \
-    ToTensord
+    Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
+    ToTensord, CenterSpatialCropd
 from monai.networks.layers import Norm
 from monai.metrics import compute_meandice
+
 monai.config.print_config()
 
 
@@ -23,8 +24,8 @@ class VSparams:
         self.data_root = './data/VS_crop/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 198, 10, 40  # number of images in training, validation and test set AFTER discarding
         self.discard_cases_idx = [219]  # specify indices of cases that are discarded
-        self.pad_crop_shape = [384, 160, 176]
-        self.spacing_pix_dim = (0.4, 0.4, 0.4)
+        self.pad_crop_shape = [128, 128, 32]
+        self.pad_crop_shape_test = [256, 128, 32 ]
         self.num_workers = 4
         self.torch_device_arg = 'cuda:0'
         if hasattr(args, 'train_batch_size'):
@@ -37,7 +38,7 @@ class VSparams:
             self.initial_learning_rate = None
         self.epochs_with_const_lr = 100
         self.weight_decay = 1e-7
-        self.num_epochs = 600
+        self.num_epochs = 300
         self.val_interval = 2  # determines how frequently validation is performed during training
 
         # paths
@@ -85,7 +86,7 @@ class VSparams:
         logger.info('num_train, num_val, num_test = {}, {}, {}'.format(self.num_train, self.num_val, self.num_test))
         logger.info('discard_cases_idx =            {}'.format(self.discard_cases_idx))
         logger.info('pad_crop_shape =               {}'.format(self.pad_crop_shape))
-        logger.info('spacing_pix_dim =              {}'.format(self.spacing_pix_dim))
+        logger.info('pad_crop_shape_test =          {}'.format(self.pad_crop_shape_test))
         logger.info('num_workers =                  {}'.format(self.num_workers))
         logger.info('torch_device_arg =             {}'.format(self.torch_device_arg))
         logger.info('train_batch_size =             {}'.format(self.train_batch_size))
@@ -151,9 +152,10 @@ class VSparams:
             AddChanneld(keys=['image', 'label']),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
-            Spacingd(keys=['image', 'label'], pixdim=self.spacing_pix_dim, interp_order=(3, 0), mode='nearest'),
             SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape),
-            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape),
+            RandFlipd(keys=['image', 'label'], prob=0.5, spatial_axis=0),
+            RandSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape, random_center=True,
+                             random_size=False),
             ToTensord(keys=['image', 'label'])
         ])
         val_transforms = Compose([
@@ -161,13 +163,24 @@ class VSparams:
             AddChanneld(keys=['image', 'label']),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
-            Spacingd(keys=['image', 'label'], pixdim=self.spacing_pix_dim, interp_order=(3, 0), mode='nearest'),
             SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape),
-            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape),
+            RandFlipd(keys=['image', 'label'], prob=0.5, spatial_axis=0),
+            RandSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape, random_center=True,
+                             random_size=False),
             ToTensord(keys=['image', 'label'])
         ])
 
-        return train_transforms, val_transforms
+        test_transforms = Compose([
+            LoadNiftid(keys=['image', 'label']),
+            AddChanneld(keys=['image', 'label']),
+            Orientationd(keys=['image', 'label'], axcodes='RAS'),
+            NormalizeIntensityd(keys=['image']),
+            SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape_test),
+            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape_test),
+            ToTensord(keys=['image', 'label'])
+        ])
+
+        return train_transforms, val_transforms, test_transforms
 
     def get_center_of_mass_slice(self, label):
         # calculate center of mass of label in trough plan direction to select a slice that shows the tumour
@@ -176,7 +189,11 @@ class VSparams:
         for z in range(num_slices):
             slice_masses[z] = label[:, :, z].sum()
 
-        slice_weights = slice_masses / sum(slice_masses)
+        if sum(slice_masses) == 0:  # if there is no label in the cropped image
+            slice_weights = np.ones(num_slices) / num_slices  # give all slices equal weight
+        else:
+            slice_weights = slice_masses / sum(slice_masses)
+
         center_of_mass = sum(slice_weights * np.arange(num_slices))
         slice_closest_to_center_of_mass = int(center_of_mass.round())
         return slice_closest_to_center_of_mass
@@ -233,8 +250,14 @@ class VSparams:
         val_loader = DataLoader(val_ds, batch_size=1, num_workers=self.num_workers)
         return val_loader
 
+    def cache_transformed_test_data(self, test_files, test_transforms):
+        test_ds = monai.data.CacheDataset(data=test_files, transform=test_transforms, cache_rate=1.0,
+                                          num_workers=self.num_workers)
+        test_loader = DataLoader(test_ds, batch_size=1, num_workers=self.num_workers)
+        return test_loader
+
     def set_and_get_model(self):
-        model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2, channels=(16, 32, 64, 128, 256),
+        model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2, channels=(16, 32, 48, 64, 80),
                                          strides=(2, 2, 2, 2), num_res_units=2, norm=Norm.BATCH).to(self.device)
         return model
 
@@ -245,6 +268,14 @@ class VSparams:
     def set_and_get_optimizer(self, model):
         optimizer = torch.optim.Adam(model.parameters(), lr=self.initial_learning_rate, weight_decay=self.weight_decay)
         return optimizer
+
+    def compute_dice_score(self, predicted_probabilities, label):
+        n_classes = predicted_probabilities.shape[1]
+        y_pred = torch.argmax(predicted_probabilities, dim=1, keepdim=True)  # pick larger value of 2 channels
+        y_pred = monai.networks.utils.one_hot(y_pred, n_classes)  # make 2 channel one hot tensor
+        dice_score = torch.tensor([[1 - monai.losses.DiceLoss(include_background=False, to_onehot_y=True, do_softmax=False,
+                                                          reduction="mean").forward(y_pred, label, smooth=1e-5)]], device=self.device)
+        return dice_score
 
     def run_training_algorithm(self, model, loss_function, optimizer, train_loader, val_loader):
         logger = self.logger
@@ -281,7 +312,8 @@ class VSparams:
                 epoch_loss += loss.item()
                 if epoch == 0:
                     logger.info(
-                        '{}/{}, train_loss: {:.4f}'.format(step, self.num_train // train_loader.batch_size, loss.item()))
+                        '{}/{}, train_loss: {:.4f}'.format(step, self.num_train // train_loader.batch_size,
+                                                           loss.item()))
             epoch_loss /= step  # calculate mean loss over current epoch
             epoch_loss_values.append(epoch_loss)
             logger.info('epoch {} average loss: {:.4f}'.format(epoch + 1, epoch_loss))
@@ -295,12 +327,15 @@ class VSparams:
                     for val_data in val_loader:  # loop over images in validation set
                         val_inputs, val_labels = val_data['image'].to(self.device), val_data['label'].to(self.device)
                         val_outputs = model(val_inputs)
-                        value = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
-                                                 to_onehot_y=True, mutually_exclusive=True)
-                        metric_count += len(value)
-                        metric_sum += value.sum().item()
+
+                        # value1 = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
+                        #                           to_onehot_y=True, mutually_exclusive=True)
+
+                        dice_score = self.compute_dice_score(val_outputs, val_labels)
+
+                        metric_count += len(dice_score)
+                        metric_sum += dice_score.sum().item()
                     metric = metric_sum / metric_count  # calculate mean Dice score of current epoch for validation set
-                    metric_values.append(metric)
                     if metric > best_metric:  # if it's the best Dice score so far, proceed to save
                         best_metric = metric
                         best_metric_epoch = epoch + 1
@@ -313,8 +348,10 @@ class VSparams:
             # learning rate update
             if (epoch + 1) % epochs_with_const_lr == 0:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = param_group['lr'] / 2
-                    logger.info('Halving learning rate to: lr = {}'.format(param_group['lr']))
+                    lr_divisor = 10.0
+                    param_group['lr'] = param_group['lr'] / lr_divisor
+                    logger.info('Dividing learning rate by {}. '
+                                'New learning rate is: lr = {}'.format(lr_divisor, param_group['lr']))
 
         logger.info('Train completed, best_metric: {:.4f}  at epoch: {}'.format(best_metric, best_metric_epoch))
         return epoch_loss_values, metric_values
@@ -341,26 +378,36 @@ class VSparams:
         model.load_state_dict(torch.load(os.path.join(self.model_path, 'best_metric_model.pth')))
         return model
 
-    def run_inference(self, model, val_loader):
+    def run_inference(self, model, data_loader):
         logger = self.logger
         model.eval()  # activate evaluation mode of model
+        dice_scores = np.zeros(len(data_loader))
         with torch.no_grad():  # turns of PyTorch's auto grad for better performance
-            for i, val_data in enumerate(val_loader):
-                logger.info('starting forward pass validation image {}'.format(i))
-                val_outputs = model(val_data['image'].to(self.device))
+            for i, data in enumerate(data_loader):
+                logger.info('starting image {}'.format(i))
+                outputs = model(data['image'].to(self.device))
+
+                dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
+                dice_scores[i] = dice_score.item()
+
+                logger.info(f"dice_score = {dice_score.item()}")
 
                 # plot centre of mass slice of label
-                label = torch.squeeze(val_data['label'][0, 0, :, :, :])
+                label = torch.squeeze(data['label'][0, 0, :, :, :])
                 slice_idx = self.get_center_of_mass_slice(
                     label)  # choose slice of selected validation set image volume for the figure
                 plt.figure('check', (18, 6))
                 plt.subplot(1, 3, 1)
                 plt.title('image ' + str(i) + ', slice = ' + str(slice_idx))
-                plt.imshow(val_data['image'][0, 0, :, :, slice_idx], cmap='gray')
+                plt.imshow(data['image'][0, 0, :, :, slice_idx], cmap='gray')
                 plt.subplot(1, 3, 2)
                 plt.title('label ' + str(i))
-                plt.imshow(val_data['label'][0, 0, :, :, slice_idx])
+                plt.imshow(data['label'][0, 0, :, :, slice_idx])
                 plt.subplot(1, 3, 3)
                 plt.title('output ' + str(i))
-                plt.imshow(torch.argmax(val_outputs, dim=1).detach().cpu()[0, :, :, slice_idx])
+                plt.imshow(torch.argmax(outputs, dim=1).detach().cpu()[0, :, :, slice_idx])
                 plt.savefig(os.path.join(self.figures_path, 'best_model_output_val' + str(i) + '.png'))
+
+        print(f"all_dice_scores = {dice_scores}")
+        print(f"mean_dice_score = {dice_scores.mean()} +- {dice_scores.std()}")
+
