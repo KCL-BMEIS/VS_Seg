@@ -12,7 +12,9 @@ from monai.transforms import \
     Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
     ToTensord, CenterSpatialCropd
 from monai.networks.layers import Norm
-from monai.metrics import compute_meandice
+# from torchviz import make_dot
+# import hiddenlayer as hl
+from .networks.nets.unet2d5 import UNet2d5
 
 monai.config.print_config()
 
@@ -25,7 +27,7 @@ class VSparams:
         self.num_train, self.num_val, self.num_test = 198, 10, 40  # number of images in training, validation and test set AFTER discarding
         self.discard_cases_idx = [219]  # specify indices of cases that are discarded
         self.pad_crop_shape = [128, 128, 32]
-        self.pad_crop_shape_test = [256, 128, 32 ]
+        self.pad_crop_shape_test = [256, 128, 32]
         self.num_workers = 4
         self.torch_device_arg = 'cuda:0'
         if hasattr(args, 'train_batch_size'):
@@ -40,6 +42,7 @@ class VSparams:
         self.weight_decay = 1e-7
         self.num_epochs = 300
         self.val_interval = 2  # determines how frequently validation is performed during training
+        self.model = "UNet2d5"
 
         # paths
         self.results_folder_path = os.path.join(self.data_root, 'results', args.results_folder_name)
@@ -94,6 +97,7 @@ class VSparams:
         logger.info('epochs_with_const_lr =         {}'.format(self.epochs_with_const_lr))
         logger.info('weight_decay =                 {}'.format(self.weight_decay))
         logger.info('num_epochs =                   {}'.format(self.num_epochs))
+        logger.info('model =                        {}'.format(self.model))
 
         logger.info('results_folder_path =          {}'.format(self.results_folder_path))
         logger.info('-' * 10)
@@ -257,12 +261,40 @@ class VSparams:
         return test_loader
 
     def set_and_get_model(self):
-        model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2, channels=(16, 32, 48, 64, 80),
-                                         strides=(2, 2, 2, 2), num_res_units=2, norm=Norm.BATCH).to(self.device)
+
+        if self.model == "UNet":
+            model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2,
+                                             channels=(16, 32, 48, 64, 80),
+                                             strides=(2, 2, 2, 2),
+                                             num_res_units=2, norm=Norm.BATCH).to(self.device)
+        elif self.model == "UNet2d5":
+            s = 2
+            k = 2
+            model = UNet2d5(dimensions=3, in_channels=1, out_channels=2,
+                            channels=(16, 32, 48, 64, 80),
+                            strides=((s, s, 1),
+                                     (s, s, 1),
+                                     (s, s, s),
+                                     (s, s, s),),
+                            kernel_sizes=((3, 3, 1),
+                                          (3, 3, 1),
+                                          (3, 3, 3),
+                                          (3, 3, 3),
+                                          (3, 3, 3),),
+                            sample_kernel_sizes=((k, k, 1),
+                                                 (k, k, 1),
+                                                 (k, k, k),
+                                                 (k, k, k),),
+                            num_res_units=2,
+                            norm=Norm.BATCH,
+                            dropout=0.1
+                            ).to(self.device)
+
+        # hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32)).save("model")
         return model
 
     def set_and_get_loss_function(self):
-        loss_function = monai.losses.DiceLoss(to_onehot_y=True, do_softmax=True)
+        loss_function = monai.losses.DiceLoss(to_onehot_y=True, softmax=True)
         return loss_function
 
     def set_and_get_optimizer(self, model):
@@ -273,8 +305,9 @@ class VSparams:
         n_classes = predicted_probabilities.shape[1]
         y_pred = torch.argmax(predicted_probabilities, dim=1, keepdim=True)  # pick larger value of 2 channels
         y_pred = monai.networks.utils.one_hot(y_pred, n_classes)  # make 2 channel one hot tensor
-        dice_score = torch.tensor([[1 - monai.losses.DiceLoss(include_background=False, to_onehot_y=True, do_softmax=False,
-                                                          reduction="mean").forward(y_pred, label, smooth=1e-5)]], device=self.device)
+        dice_score = torch.tensor(
+            [[1 - monai.losses.DiceLoss(include_background=False, to_onehot_y=True, softmax=False,
+                                        reduction="mean").forward(y_pred, label, smooth=1e-5)]], device=self.device)
         return dice_score
 
     def run_training_algorithm(self, model, loss_function, optimizer, train_loader, val_loader):
@@ -306,6 +339,7 @@ class VSparams:
                 inputs, labels = batch_data['image'].to(self.device), batch_data['label'].to(self.device)
                 optimizer.zero_grad()  # reset the optimizer gradient
                 outputs = model(inputs)  # evaluate the model
+                # make_dot(outputs.mean(), params=dict(model.named_parameters())).render("attached", format="png")
                 loss = loss_function(outputs, labels)
                 loss.backward()  # computes the gradients
                 optimizer.step()  # update the model weights
@@ -410,4 +444,3 @@ class VSparams:
 
         print(f"all_dice_scores = {dice_scores}")
         print(f"mean_dice_score = {dice_scores.mean()} +- {dice_scores.std()}")
-

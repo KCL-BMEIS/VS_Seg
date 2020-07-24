@@ -33,7 +33,7 @@ p.log_parameters()
 train_files, val_files, test_files = p.load_T1_or_T2_data()
 
 # define the transforms
-train_transforms, val_transforms = p.get_transforms()
+train_transforms, val_transforms, test_transforms = p.get_transforms()
 
 # Set deterministic training for reproducibility
 monai.utils.set_determinism(seed=0)

@@ -11,7 +11,7 @@ monai.config.print_config()
 
 # read and configure arguments
 parser = argparse.ArgumentParser(description='Evaluate a trained model')
-parser.add_argument('--results_folder_name', type=str, default='UNet3D',
+parser.add_argument('--results_folder_name', type=str, default='UNet2d5_residual',
                     help='name of results folder')
 args = parser.parse_args()
 
