@@ -269,7 +269,7 @@ class VSparams:
                                              num_res_units=2, norm=Norm.BATCH).to(self.device)
         elif self.model == "UNet2d5":
             s = 2
-            k = 2
+            k = 3
             model = UNet2d5(dimensions=3, in_channels=1, out_channels=2,
                             channels=(16, 32, 48, 64, 80),
                             strides=((s, s, 1),
