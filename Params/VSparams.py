@@ -14,7 +14,9 @@ from monai.transforms import \
 from monai.networks.layers import Norm
 # from torchviz import make_dot
 # import hiddenlayer as hl
+from .networks.nets.unet import UNet
 from .networks.nets.unet2d5 import UNet2d5
+from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
 
 monai.config.print_config()
 
@@ -42,7 +44,7 @@ class VSparams:
         self.weight_decay = 1e-7
         self.num_epochs = 300
         self.val_interval = 2  # determines how frequently validation is performed during training
-        self.model = "UNet2d5"
+        self.model = "UNet2d5_spvPA"
 
         # paths
         self.results_folder_path = os.path.join(self.data_root, 'results', args.results_folder_name)
@@ -267,10 +269,47 @@ class VSparams:
                                              channels=(16, 32, 48, 64, 80),
                                              strides=(2, 2, 2, 2),
                                              num_res_units=2, norm=Norm.BATCH).to(self.device)
+        elif self.model == "UNet_loc":
+            model = UNet(dimensions=3, in_channels=1, out_channels=2,
+                                             channels=(16, 32, 48, 64, 80),
+                                             kernel_sizes=((3, 3, 1),
+                                                           (3, 3, 1),
+                                                           (3, 3, 3),
+                                                           (3, 3, 3),
+                                                           (3, 3, 3),),
+                                             strides=((2, 2, 1),
+                                                      (2, 2, 1),
+                                                      (2, 2, 2),
+                                                      (2, 2, 2)),
+                                             num_res_units=2, norm=Norm.BATCH).to(self.device)
+
         elif self.model == "UNet2d5":
             s = 2
             k = 3
             model = UNet2d5(dimensions=3, in_channels=1, out_channels=2,
+                            channels=(16, 32, 48, 64, 80),
+                            strides=((s, s, 1),
+                                     (s, s, 1),
+                                     (s, s, s),
+                                     (s, s, s),),
+                            kernel_sizes=((3, 3, 1),
+                                          (3, 3, 1),
+                                          (3, 3, 3),
+                                          (3, 3, 3),
+                                          (3, 3, 3),),
+                            sample_kernel_sizes=((k, k, 1),
+                                                 (k, k, 1),
+                                                 (k, k, k),
+                                                 (k, k, k),),
+                            num_res_units=2,
+                            norm=Norm.BATCH,
+                            dropout=0.1
+                            ).to(self.device)
+
+        elif self.model == "UNet2d5_spvPA":
+            s = 2
+            k = 3
+            model = UNet2d5_spvPA(dimensions=3, in_channels=1, out_channels=2,
                             channels=(16, 32, 48, 64, 80),
                             strides=((s, s, 1),
                                      (s, s, 1),
@@ -442,5 +481,5 @@ class VSparams:
                 plt.imshow(torch.argmax(outputs, dim=1).detach().cpu()[0, :, :, slice_idx])
                 plt.savefig(os.path.join(self.figures_path, 'best_model_output_val' + str(i) + '.png'))
 
-        print(f"all_dice_scores = {dice_scores}")
-        print(f"mean_dice_score = {dice_scores.mean()} +- {dice_scores.std()}")
+        logger.info(f"all_dice_scores = {dice_scores}")
+        logger.info(f"mean_dice_score = {dice_scores.mean()} +- {dice_scores.std()}")
