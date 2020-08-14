@@ -17,6 +17,7 @@ from monai.networks.layers import Norm
 from .networks.nets.unet import UNet
 from .networks.nets.unet2d5 import UNet2d5
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
+from .losses.dice_spvPA import Dice_spvPA
 
 monai.config.print_config()
 
@@ -25,7 +26,7 @@ class VSparams:
 
     def __init__(self, args):
         self.dataset = 'T2'  # choose 'T1' or 'T2'
-        self.data_root = './data/VS_crop/'  # set path to data set
+        self.data_root = '../data/VS_crop/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 198, 10, 40  # number of images in training, validation and test set AFTER discarding
         self.discard_cases_idx = [219]  # specify indices of cases that are discarded
         self.pad_crop_shape = [128, 128, 32]
@@ -333,7 +334,7 @@ class VSparams:
         return model
 
     def set_and_get_loss_function(self):
-        loss_function = monai.losses.DiceLoss(to_onehot_y=True, softmax=True)
+        loss_function = Dice_spvPA(to_onehot_y=True, softmax=True)
         return loss_function
 
     def set_and_get_optimizer(self, model):
@@ -377,7 +378,7 @@ class VSparams:
                 step += 1
                 inputs, labels = batch_data['image'].to(self.device), batch_data['label'].to(self.device)
                 optimizer.zero_grad()  # reset the optimizer gradient
-                outputs = model(inputs)  # evaluate the model
+                outputs = model(inputs)[0]  # evaluate the model
                 # make_dot(outputs.mean(), params=dict(model.named_parameters())).render("attached", format="png")
                 loss = loss_function(outputs, labels)
                 loss.backward()  # computes the gradients
@@ -399,7 +400,7 @@ class VSparams:
                     metric_count = 0
                     for val_data in val_loader:  # loop over images in validation set
                         val_inputs, val_labels = val_data['image'].to(self.device), val_data['label'].to(self.device)
-                        val_outputs = model(val_inputs)
+                        val_outputs = model(val_inputs)[0]
 
                         # value1 = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
                         #                           to_onehot_y=True, mutually_exclusive=True)
