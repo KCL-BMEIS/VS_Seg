@@ -221,7 +221,7 @@ class Dice_spvPA(_Loss):
         self.squared_pred = squared_pred
         self.jaccard = jaccard
 
-    def forward(self, input: torch.Tensor, target: torch.Tensor, smooth: float = 1e-5) -> torch.Tensor:
+    def forward(self, input, target: torch.Tensor, smooth: float = 1e-5) -> torch.Tensor:
         """
         Args:
             input: the shape should be BNH[WD].
@@ -232,65 +232,37 @@ class Dice_spvPA(_Loss):
             ValueError: When ``self.reduction`` is not one of ["mean", "sum", "none"].
 
         """
-        if self.sigmoid:
-            input = torch.sigmoid(input)
 
-        n_pred_ch = input.shape[1]
-        if self.softmax:
-            if n_pred_ch == 1:
-                warnings.warn("single channel prediction, `softmax=True` ignored.")
-            else:
-                input = torch.softmax(input, 1)
+        x, att_maps = input
 
-        if self.other_act is not None:
-            input = self.other_act(input)
+        loss_function_single_channel = Dice(to_onehot_y=False, softmax=False)
 
-        if self.to_onehot_y:
-            if n_pred_ch == 1:
-                warnings.warn("single channel prediction, `to_onehot_y=True` ignored.")
-            else:
-                target = one_hot(target, num_classes=n_pred_ch)
+        L = len(att_maps)
+        att_losses = []
+        total_att_loss = 0
+        G_l = target
+        for level in range(L):
+            # A[level] are the attention maps as they arrive here
+            # G[level] are downsampled ground truth maps, they are converted to one-hot inside the loss-function
+            att_loss = loss_function_single_channel(att_maps[L-level-1], G_l)
+            att_losses.append(att_loss)
+            total_att_loss = total_att_loss + 1/L * att_loss
 
-        if not self.include_background:
-            if n_pred_ch == 1:
-                warnings.warn("single channel prediction, `include_background=False` ignored.")
-            else:
-                # if skipping background, removing first channel
-                target = target[:, 1:]
-                input = input[:, 1:]
+            if level < L-1:
+                shape_curr_att_map = att_maps[L-level-1].shape
+                shape_next_att_map = att_maps[L-level-2].shape
 
-        assert (
-                target.shape == input.shape
-        ), f"ground truth has differing shape ({target.shape}) from input ({input.shape})"
+                # assert that shape of current attention map is multiple of next att map in all dimensions
+                assert(all([x % y == 0 for x, y in zip(shape_curr_att_map, shape_next_att_map)]))
+                shape_ratio = [x//y for x, y in zip(shape_curr_att_map, shape_next_att_map)]
 
-        # reducing only spatial dimensions (not batch nor channels)
-        reduce_axis = list(range(2, len(input.shape)))
-        intersection = torch.sum(target * input, dim=reduce_axis)
+                kernel_size_and_stride = shape_ratio[2:5]
+                G_l = torch.nn.MaxPool3d(kernel_size=kernel_size_and_stride,
+                                         stride=kernel_size_and_stride)(G_l)
 
-        if self.squared_pred:
-            target = torch.pow(target, 2)
-            input = torch.pow(input, 2)
-
-        ground_o = torch.sum(target, dim=reduce_axis)
-        pred_o = torch.sum(input, dim=reduce_axis)
-
-        denominator = ground_o + pred_o
-
-        if self.jaccard:
-            denominator = 2.0 * (denominator - intersection)
-
-        f = 1.0 - (2.0 * intersection + smooth) / (denominator + smooth)
-
-        if self.reduction == LossReduction.MEAN.value:
-            f = torch.mean(f)  # the batch and channel average
-        elif self.reduction == LossReduction.SUM.value:
-            f = torch.sum(f)  # sum over the batch and channel dims
-        elif self.reduction == LossReduction.NONE.value:
-            pass  # returns [N, n_classes] losses
-        else:
-            raise ValueError(f'Unsupported reduction: {self.reduction}, available options are ["mean", "sum", "none"].')
-
-        return f
+        loss_function_multi_channel = Dice(to_onehot_y=True, softmax=True)
+        pred_loss = loss_function_multi_channel(x, target)
+        return total_att_loss + pred_loss
 
 
 

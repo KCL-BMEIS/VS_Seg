@@ -378,7 +378,7 @@ class VSparams:
                 step += 1
                 inputs, labels = batch_data['image'].to(self.device), batch_data['label'].to(self.device)
                 optimizer.zero_grad()  # reset the optimizer gradient
-                outputs = model(inputs)[0]  # evaluate the model
+                outputs = model(inputs)  # evaluate the model
                 # make_dot(outputs.mean(), params=dict(model.named_parameters())).render("attached", format="png")
                 loss = loss_function(outputs, labels)
                 loss.backward()  # computes the gradients
