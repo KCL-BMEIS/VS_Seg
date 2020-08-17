@@ -46,6 +46,7 @@ class DiceLoss(_Loss):
         other_act: Optional[Callable] = None,
         squared_pred: bool = False,
         jaccard: bool = False,
+        hardness_weight=None,
         reduction: Union[LossReduction, str] = LossReduction.MEAN,
     ) -> None:
         """
@@ -84,6 +85,7 @@ class DiceLoss(_Loss):
         self.other_act = other_act
         self.squared_pred = squared_pred
         self.jaccard = jaccard
+        self.hardness_weight = hardness_weight
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, smooth: float = 1e-5) -> torch.Tensor:
         """
@@ -129,14 +131,22 @@ class DiceLoss(_Loss):
 
         # reducing only spatial dimensions (not batch nor channels)
         reduce_axis = list(range(2, len(input.shape)))
-        intersection = torch.sum(target * input, dim=reduce_axis)
+
+        if self.hardness_weight is not None:
+            intersection = torch.sum(self.hardness_weight * target * input, dim=reduce_axis)
+        else:
+            intersection = torch.sum(target * input, dim=reduce_axis)
 
         if self.squared_pred:
             target = torch.pow(target, 2)
             input = torch.pow(input, 2)
 
-        ground_o = torch.sum(target, dim=reduce_axis)
-        pred_o = torch.sum(input, dim=reduce_axis)
+        if self.hardness_weight is not None:
+            ground_o = torch.sum(self.hardness_weight * target, dim=reduce_axis)
+            pred_o = torch.sum(self.hardness_weight * input, dim=reduce_axis)
+        else:
+            ground_o = torch.sum(target, dim=reduce_axis)
+            pred_o = torch.sum(input, dim=reduce_axis)
 
         denominator = ground_o + pred_o
 
@@ -260,7 +270,9 @@ class Dice_spvPA(_Loss):
                 G_l = torch.nn.MaxPool3d(kernel_size=kernel_size_and_stride,
                                          stride=kernel_size_and_stride)(G_l)
 
-        loss_function_multi_channel = Dice(to_onehot_y=True, softmax=True)
+        hardness_lambda = 0.6
+        hardness_weight = hardness_lambda * abs(x - one_hot(target, num_classes=x.shape[1])) + (1.0 - hardness_lambda)
+        loss_function_multi_channel = Dice(to_onehot_y=True, softmax=True, hardness_weight=hardness_weight)
         pred_loss = loss_function_multi_channel(x, target)
         return total_att_loss + pred_loss
 
