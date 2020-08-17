@@ -14,7 +14,7 @@ class AttentionBlock1(torch.nn.Module):
                                  kernel_size=kernel_size,
                                  act=Act.RELU,
                                  norm=norm,
-                                 dropout=dropout,
+                                 dropout=None,
                                  )
 
         self.conv2 = Convolution(dimensions,
@@ -24,7 +24,7 @@ class AttentionBlock1(torch.nn.Module):
                                  kernel_size=kernel_size,
                                  act=Act.SIGMOID,
                                  norm=norm,
-                                 dropout=dropout,
+                                 dropout=None,
                                  )
 
     def forward(self, x):
