@@ -1,10 +1,11 @@
 #!/bin/bash
 
-pip install git+https://github.com/Project-MONAI/MONAI.git@eb104391d18e7c8325d9e3efd5b56f7c2f7fad4a
+pip install git+https://github.com/Project-MONAI/MONAI.git@0d197e6bea9dd2244c63b80a80b464ef23a5aab9
+pip install nibabel
 pip install natsort
 
 PROJECT_PATH="/workspace/home/projects/VS_Seg"
-RESUlTS_FOLDER_NAME="UNet3D"
+RESUlTS_FOLDER_NAME="UNet_testing"
 
 cd $PROJECT_PATH
 

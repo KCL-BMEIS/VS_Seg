@@ -11,7 +11,7 @@
 
 import torch.nn as nn
 
-from monai.networks.blocks.convolutions import Convolution, ResidualUnit
+from Params.networks.blocks.convolutions import Convolution, ResidualUnit
 from ..blocks.attentionblock import AttentionBlock1, AttentionBlock2
 from monai.networks.layers.factories import Norm, Act
 from monai.networks.layers.simplelayers import SkipConnection

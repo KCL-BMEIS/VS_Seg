@@ -26,7 +26,7 @@ class VSparams:
 
     def __init__(self, args):
         self.dataset = 'T2'  # choose 'T1' or 'T2'
-        self.data_root = '../data/VS_crop/'  # set path to data set
+        self.data_root = './data/VS_crop/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 198, 10, 40  # number of images in training, validation and test set AFTER discarding
         self.discard_cases_idx = [219]  # specify indices of cases that are discarded
         self.pad_crop_shape = [128, 128, 32]
