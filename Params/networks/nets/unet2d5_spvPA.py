@@ -34,6 +34,7 @@ class UNet2d5_spvPA(nn.Module):
             act=Act.PRELU,
             norm=Norm.INSTANCE,
             dropout=0,
+            attention_module=True,
     ):
         super().__init__()
         assert len(channels) == len(kernel_sizes) == (len(strides)) + 1 == len(sample_kernel_sizes) + 1
@@ -48,6 +49,7 @@ class UNet2d5_spvPA(nn.Module):
         self.act = act
         self.norm = norm
         self.dropout = dropout
+        self.attention_module = attention_module
         self.att_maps = []
 
         def _create_block(inc, outc, channels, strides, kernel_sizes, sample_kernel_sizes, is_top):
@@ -87,9 +89,10 @@ class UNet2d5_spvPA(nn.Module):
                                    self.sample_kernel_sizes, True)
 
         # register forward hooks on all Attentionblock1 modules, to save the attention maps
-        for layer in self.model.modules():
-            if type(layer) == AttentionBlock1:
-                layer.register_forward_hook(self.hook_save_attention_map)
+        if self.attention_module:
+            for layer in self.model.modules():
+                if type(layer) == AttentionBlock1:
+                    layer.register_forward_hook(self.hook_save_attention_map)
 
     def hook_save_attention_map(self, module, inp, outp):
         if len(self.att_maps) == len(self.channels):
@@ -157,9 +160,13 @@ class UNet2d5_spvPA(nn.Module):
         return conv
 
     def _get_bottom_layer(self, in_channels, out_channels, kernel_size):
-        att_layer = self._get_att_layer(in_channels, in_channels, kernel_size)
         conv = self._get_down_layer(in_channels, out_channels, kernel_size)
-        return nn.Sequential(att_layer, conv)
+        if self.attention_module:
+            att_layer = self._get_att_layer(in_channels, in_channels, kernel_size)
+            return nn.Sequential(att_layer, conv)
+        else:
+            return conv
+
 
     def _get_upsample_layer(self, in_channels, out_channels, strides, up_kernel_size):
         conv = Convolution(
@@ -177,7 +184,8 @@ class UNet2d5_spvPA(nn.Module):
 
     def _get_up_layer(self, in_channels, out_channels, kernel_size, is_top):
 
-        att_layer = self._get_att_layer(in_channels, in_channels, kernel_size)
+        if self.attention_module:
+            att_layer = self._get_att_layer(in_channels, in_channels, kernel_size)
 
         if self.num_res_units > 0:
             ru = ResidualUnit(
@@ -186,15 +194,23 @@ class UNet2d5_spvPA(nn.Module):
                 out_channels,
                 strides=1,
                 kernel_size=kernel_size,
-                subunits=1,
+                subunits=1,  # why not self.num_res_units?
                 act=self.act,
                 norm=self.norm,
                 dropout=self.dropout,
                 last_conv_only=is_top,
             )
+
+        if self.attention_module and self.num_res_units > 0:
             return nn.Sequential(att_layer, ru)
+        elif self.attention_module and not self.num_res_units > 0:
+            return att_layer
+        elif self.num_res_units > 0 and not self.attention_module:
+            return ru
+        elif not self.attention_module and not self.num_res_units > 0:
+            return nn.Identity
         else:
-            return nn.Sequential()  # TODO
+            raise NotImplementedError
 
     def forward(self, x):
         x = self.model(x)
