@@ -471,7 +471,7 @@ class VSparams:
         with torch.no_grad():  # turns of PyTorch's auto grad for better performance
             for i, data in enumerate(data_loader):
                 logger.info('starting image {}'.format(i))
-                outputs = model(data['image'].to(self.device))
+                outputs = model(data['image'].to(self.device))[0]
 
                 dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
                 dice_scores[i] = dice_score.item()

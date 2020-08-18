@@ -13,11 +13,13 @@ monai.config.print_config()
 parser = argparse.ArgumentParser(description='Train the model')
 parser.add_argument('--train_batch_size', type=int, default=2, help='batch size of the forward pass')
 parser.add_argument('--initial_learning_rate', type=float, default=1e-4, help='learning rate at first epoch')
-parser.add_argument('--attention', type=bool, default=True, help='(bool) whether to include the attention module '
-                                                                 'in the network and the attention map weighting in the'
-                                                                 'loss function')
-parser.add_argument('--hardness', type=bool, default=True, help='(bool) whether to include hardness weighting in the'
-                                                                 'loss function')
+parser.add_argument('--no_attention', dest='attention', action='store_false', help='disables the attention module in '
+                                                                                   'the network and the attention map '
+                                                                                   'weighting in the loss function')
+parser.set_defaults(attention=True)
+parser.add_argument('--no_hardness', dest='hardness', action='store_false', help='disables the hardness weighting in '
+                                                                                 'the loss function')
+parser.set_defaults(hardness=True)
 parser.add_argument('--results_folder_name', type=str, default='temp' + strftime("%Y%m%d%H%M%S"),
                     help='name of results folder')
 args = parser.parse_args()
