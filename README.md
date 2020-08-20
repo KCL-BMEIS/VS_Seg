@@ -6,6 +6,9 @@ based on the following paper:
 * Wang, G. et al. Automatic Segmentation of Vestibular Schwannoma from T2-Weighted MRI by Deep 
 Spatial Attention with Hardness-Weighted Loss, MICCAI, pp 264-272, 2019.
 
+
+## Model
+
 The implementation is based on [MONAI](https://monai.io/) and the network has a couple of differences
 compared to the network described in the paper:
 
@@ -18,6 +21,7 @@ maxpooling.
 - each convolution (except from the convolutions of the attention module) has a dropout layer
 following the PRelu activation
 
+<img src="model_sketch.png" width="880" height="1000">
 
 ##  Requirements
 
@@ -30,7 +34,8 @@ The following setup has been tested on Ubuntu 20.04.
 * Python. Suggested version is 3.6.
 
 * [PyTorch](https://pytorch.org/get-started/locally/) (recommended 1.6.0)
-    pip install torch
+
+        pip install torch
     
 * [MONAI](https://monai.io/) The code has been tested with github commit 0d197e which can be installed with:
 

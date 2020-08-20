@@ -13,7 +13,7 @@ from monai.transforms import \
     ToTensord, CenterSpatialCropd
 from monai.networks.layers import Norm
 # from torchviz import make_dot
-# import hiddenlayer as hl
+import hiddenlayer as hl
 from .networks.nets.unet import UNet
 from .networks.nets.unet2d5 import UNet2d5
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
@@ -341,7 +341,7 @@ class VSparams:
                                   attention_module=self.attention,
                                   ).to(self.device)
 
-        # hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32)).save("model")
+        hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32).to(self.device)).save("model")
         return model
 
     def set_and_get_loss_function(self):
