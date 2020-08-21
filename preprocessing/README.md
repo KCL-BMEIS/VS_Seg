@@ -1,7 +1,6 @@
 # Data preprocessing
 Data preprocessing typically includes converting DICOM images and DICOM RTstructures to NIFTI files.
 
-In this section, we 
 
 ##  Requirements
 
