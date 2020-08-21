@@ -6,7 +6,7 @@ Data preprocessing typically includes converting DICOM images and DICOM RTstruct
 
 The following setup has been tested on Ubuntu 20.04.
 
-* 3D Slicer (https://download.slicer.org/)
+* 3D Slicer (https://download.slicer.org/). Unpack the archive in <SLICER_DIR>.
 * SlicerRT (http://slicerrt.github.io/Download.html)
 
 * Download the raw data in <DATA_FOLDER>
