@@ -13,7 +13,7 @@ from monai.transforms import \
     ToTensord, CenterSpatialCropd
 from monai.networks.layers import Norm
 # from torchviz import make_dot
-import hiddenlayer as hl
+# import hiddenlayer as hl
 from .networks.nets.unet import UNet
 from .networks.nets.unet2d5 import UNet2d5
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
@@ -27,8 +27,10 @@ class VSparams:
     def __init__(self, args):
         self.dataset = 'T2'  # choose 'T1' or 'T2'
         self.data_root = './data/VS_crop/'  # set path to data set
-        self.num_train, self.num_val, self.num_test = 195, 10, 40  # number of images in training, validation and test set AFTER discarding
-        self.discard_cases_idx = [39, 97, 130, 219]  # specify indices of cases that are discarded
+        self.num_train, self.num_val, self.num_test = 177, 20, 46  # number of images in training, validation and test set AFTER discarding
+        self.discard_cases_idx = [39, 97, 130, 160,  # specify indices of cases that are excluded
+                                                     # 39 due to duplicate, 97, 130, 219 because T1 and T2 are the same for these cases
+                                  208, 227]  # 208, 219 due to partial scanning (not present in dataset), 227 due to duplicate
         self.pad_crop_shape = [128, 128, 32]
         self.pad_crop_shape_test = [256, 128, 32]
         self.num_workers = 4
@@ -341,7 +343,7 @@ class VSparams:
                                   attention_module=self.attention,
                                   ).to(self.device)
 
-        hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32).to(self.device)).save("model")
+        # hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32).to(self.device)).save("model")
         return model
 
     def set_and_get_loss_function(self):

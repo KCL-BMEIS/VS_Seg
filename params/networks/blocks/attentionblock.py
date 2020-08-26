@@ -1,5 +1,5 @@
 import torch
-from Params.networks.blocks.convolutions import Convolution
+from params.networks.blocks.convolutions import Convolution
 from monai.networks.layers.factories import Act
 
 

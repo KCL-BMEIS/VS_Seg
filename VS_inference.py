@@ -5,7 +5,7 @@ import argparse
 from time import strftime
 import monai
 
-from Params.VSparams import VSparams
+from params.VSparams import VSparams
 
 monai.config.print_config()
 
