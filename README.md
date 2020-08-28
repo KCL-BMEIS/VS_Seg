@@ -97,9 +97,16 @@ To start the training run the following command from a terminal in the VS_Seg re
 
         python3 VS_inference.py --results_folder_name $RESUlTS_FOLDER_NAME 2> inference_error_log.txt
 
+optional parameters:
+
+`--no_attention` removes attention module from neural network and attention maps from loss function
+
+`--no_hardness` removes voxel hardness weighting from loss function
+
+`--dataset T1` or `--dataset T2` to select the T1 or T2 dataset (default: T1)
+
 <RESUlTS_FOLDER_NAME> has to match the name chosen in the training command.
 The script will create in the folders:
-
 * figures &#10230; one png file per image in the test set showing the centre of mass slice (based 
 on ground truth label) with ground truth label and predicted label
 * logs &#10230; test_log.txt contains individual and mean dice scores of test set

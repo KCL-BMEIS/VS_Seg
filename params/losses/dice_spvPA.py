@@ -106,7 +106,7 @@ class DiceLoss(_Loss):
             if n_pred_ch == 1:
                 warnings.warn("single channel prediction, `softmax=True` ignored.")
             else:
-                input = torch.softmax(input, 1)
+                input = torch.softmax(input, dim=1)
 
         if self.other_act is not None:
             input = self.other_act(input)
@@ -279,8 +279,18 @@ class Dice_spvPA(_Loss):
         hardness_weight = None
         if self.hardness_weighting:
             hardness_lambda = 0.6
-            hardness_weight = hardness_lambda * abs(x - one_hot(target, num_classes=x.shape[1])) \
+            hardness_weight = hardness_lambda * abs(torch.softmax(x, dim=1) - one_hot(target, num_classes=x.shape[1])) \
                               + (1.0 - hardness_lambda)
+            # img = hardness_weight.cpu().detach().numpy()
+            # x_ = torch.softmax(x, dim=1).cpu().detach().numpy()
+            # target_ = one_hot(target, num_classes=x.shape[1]).cpu().detach().numpy()
+            # import matplotlib.pyplot as plt
+            # fig, axs = plt.subplots(1, 3)
+            # axs[0].imshow(x_[1, 1, :, :, 20], cmap='gray')
+            # axs[1].imshow(target_[1, 1, :, :, 20])
+            # axs[2].imshow(img[1, 1, :, :, 20])
+            # plt.show()
+            # pass
 
         loss_function_multi_channel = Dice(to_onehot_y=True, softmax=True, hardness_weight=hardness_weight)
         pred_loss = loss_function_multi_channel(x, target)

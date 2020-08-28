@@ -25,7 +25,10 @@ monai.config.print_config()
 class VSparams:
 
     def __init__(self, args):
-        self.dataset = 'T2'  # choose 'T1' or 'T2'
+        if hasattr(args, 'train_batch_size'):
+            self.dataset = args.dataset
+        else:
+            self.dataset = None
         self.data_root = './data/VS_crop/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 177, 20, 46  # number of images in training, validation and test set AFTER discarding
         self.discard_cases_idx = [39, 97, 130, 160,  # specify indices of cases that are excluded
@@ -436,7 +439,7 @@ class VSparams:
             # learning rate update
             if (epoch + 1) % epochs_with_const_lr == 0:
                 for param_group in optimizer.param_groups:
-                    lr_divisor = 10.0
+                    lr_divisor = 2.0
                     param_group['lr'] = param_group['lr'] / lr_divisor
                     logger.info('Dividing learning rate by {}. '
                                 'New learning rate is: lr = {}'.format(lr_divisor, param_group['lr']))
