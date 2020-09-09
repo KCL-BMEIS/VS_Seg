@@ -194,7 +194,7 @@ class UNet2d5_spvPA(nn.Module):
                 out_channels,
                 strides=1,
                 kernel_size=kernel_size,
-                subunits=1,  # why not self.num_res_units?
+                subunits=self.num_res_units,  # why not self.num_res_units?
                 act=self.act,
                 norm=self.norm,
                 dropout=self.dropout,

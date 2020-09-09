@@ -31,9 +31,9 @@ class VSparams:
             self.dataset = None
         self.data_root = './data/VS_crop/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 177, 20, 46  # number of images in training, validation and test set AFTER discarding
-        self.discard_cases_idx = [39, 97, 130, 160,  # specify indices of cases that are excluded
-                                                     # 39 due to duplicate, 97, 130, 219 because T1 and T2 are the same for these cases
-                                  208, 227]  # 208, 219 due to partial scanning (not present in dataset), 227 due to duplicate
+        self.discard_cases_idx = [97, 130, 160,  # specify indices of cases that are excluded
+                                                 # 39 due to duplicate (not present in dataset), 97, 130, 160 because T1 and T2 are the same for these cases
+                                  219, 208, 227]  # 208, 219 due to partial scanning, 227 due to duplicate
         self.pad_crop_shape = [128, 128, 32]
         self.pad_crop_shape_test = [256, 128, 32]
         self.num_workers = 4
