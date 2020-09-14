@@ -427,6 +427,7 @@ class VSparams:
                         metric_count += len(dice_score)
                         metric_sum += dice_score.sum().item()
                     metric = metric_sum / metric_count  # calculate mean Dice score of current epoch for validation set
+                    metric_values.append(metric)
                     if metric > best_metric:  # if it's the best Dice score so far, proceed to save
                         best_metric = metric
                         best_metric_epoch = epoch + 1
