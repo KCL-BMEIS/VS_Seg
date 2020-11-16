@@ -33,41 +33,46 @@ def convert_image_and_segmentation(output_dir, pat=False):
         Convert RT structures to nifti
     """
     #RT structure node
-    ns = getNodesByClass('vtkMRMLSegmentationNode')
-    segmentation = ns[0]
-
+    ns = getNodesByClass('vtkMRMLSegmentationNode')  # gets the nodes that correspond to RT structures
+    segmentation = ns[0]  # picks the first RT structure
+#
     #Volume node
-    ns = getNodesByClass('vtkMRMLScalarVolumeNode')
+    ns = getNodesByClass('vtkMRMLScalarVolumeNode')  # picks the image data nodes
+#
+    # loop over all volume nodes and keep the last one that doesn't have 'RT' in its name
+    # ??? why the last one though --> usually there is only one
     for k in ns:
         if not 'RT' in k.GetName():
             vol = k
-    
-
+#
+#
     # Saving Volume to nii.gz
     if not pat:
         fileName_vol = vol.GetName() + '.nii.gz'
     else:
         fileName_vol = pat + '.nii.gz'
     fileName_vol = output_dir + '/' + fileName_vol
-    fileName_vol = fileName_vol.translate(None, ''.join(charsRoRemove))
+    # remove the charsRoRemove from fileName
+    fileName_vol = fileName_vol.translate(None, ''.join(charsRoRemove))  # ''.join(charsRoRemove) --> creates single string with charsRoRemove separated by ''
     logging.info('[WRITING] Saving volume to file ' + fileName_vol)
-    slicer.util.saveNode(vol, fileName_vol)  
+    slicer.util.saveNode(vol, fileName_vol)  # pass vol node and destination filename
 
-
-
-    segmentIDs = vtk.vtkStringArray()
-    segmentation.GetSegmentation().GetSegmentIDs(segmentIDs)
+    segmentIDs = vtk.vtkStringArray()  # create new array
+    segmentation.GetSegmentation().GetSegmentIDs(segmentIDs)  # save IDs of all Segmentations in segmentIDs array, e.g. skull, tumor, cochlea
     for segmentIndex in xrange(0, segmentIDs.GetNumberOfValues()):
         # Selecting a RT structure
         segmentID = segmentIDs.GetValue(segmentIndex)
-        segmentID_a = vtk.vtkStringArray()
-        segmentID_a.SetNumberOfValues(1)
-        segmentID_a.SetValue(0, segmentID)
+
+        # create new array and store only the ID of current iteration in it
+        segmentID_a = vtk.vtkStringArray()  # new array
+        segmentID_a.SetNumberOfValues(1)  # define length
+        segmentID_a.SetValue(0, segmentID)  # define first value by segmentID
 
         # Creating a Label Map node with the RT structure
         sl = slicer.modules.segmentations.logic()
         rt_lm = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
-        sl.ExportSegmentsToLabelmapNode(segmentation,segmentID_a, rt_lm, vol)
+
+        sl.ExportSegmentsToLabelmapNode(segmentation, segmentID_a, rt_lm, vol)  # arguments: RT-structure node, Segmentation ID (skull?), new label map node, reference volume)
 
         # Saving the LabelMap to nii.gz
         if not pat:
@@ -81,7 +86,6 @@ def convert_image_and_segmentation(output_dir, pat=False):
 
 
 def main(argv):
-
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Batch Structure Set Conversion")
     parser.add_argument("-i", "--input-folder", dest="input_folder", metavar="PATH",
@@ -108,23 +112,23 @@ def main(argv):
     DICOMUtils.openTemporaryDatabase()
 
     patient_dirs = os.listdir(input_folder)
-    patient_dirs  = [patient_dir for patient_dir in patient_dirs if os.path.isdir(os.path.join(input_folder, patient_dir))]
+    patient_dirs = [patient_dir for patient_dir in patient_dirs if os.path.isdir(os.path.join(input_folder, patient_dir))]
 
     list_fails = []
     for patient_dir in patient_dirs:
         try: 
             slicer.dicomDatabase.initializeDatabase()
-            DICOMUtils.importDicom(os.path.join(input_folder,patient_dir))
+            DICOMUtils.importDicom(os.path.join(input_folder, patient_dir))  # load only one patient
 
             logging.info("Import DICOM data from " + os.path.join(input_folder,patient_dir))
             slicer.mrmlScene.Clear(0)
-            patient = slicer.dicomDatabase.patients()[0]
-            DICOMUtils.loadPatientByUID(patient)
-            output_dir = os.path.join(output_folder,patient_dir)
+            patient = slicer.dicomDatabase.patients()[0]  # select the patient from the database (which has only one patient)
+            DICOMUtils.loadPatientByUID(patient)  # load selected patient into slicer
+            output_dir = os.path.join(output_folder, patient_dir)
             if not os.access(output_dir, os.F_OK):
                 os.mkdir(output_dir)
-            patient_dir = patient_dir.replace(' ', '_')
-            convert_image_and_segmentation(output_dir,patient_dir)
+            patient_dir = patient_dir.replace(' ', '_')  # the created output directory seems to have _ instead of ' '
+            convert_image_and_segmentation(output_dir, patient_dir)
         except Exception:
             list_fails.append('Error with ' + str(patient_dir) + "\n" + traceback.format_exc())
 
