@@ -6,7 +6,9 @@ from time import perf_counter
 import glob
 import torch
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
+from matplotlib import pyplot as plt
 import monai
 from monai.transforms import \
     Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
@@ -29,13 +31,11 @@ class VSparams:
             self.dataset = args.dataset
         else:
             self.dataset = None
-        self.data_root = './data/VS_crop/'  # set path to data set
-        self.num_train, self.num_val, self.num_test = 177, 20, 46  # number of images in training, validation and test set AFTER discarding
-        self.discard_cases_idx = [97, 130, 160,  # specify indices of cases that are excluded
-                                                 # 39 due to duplicate (not present in dataset), 97, 130, 160 because T1 and T2 are the same for these cases
-                                  219, 208, 227]  # 208, 219 due to partial scanning, 227 due to duplicate
-        self.pad_crop_shape = [128, 128, 32]
-        self.pad_crop_shape_test = [256, 128, 32]
+        self.data_root = './data/VS_defaced/'  # set path to data set
+        self.num_train, self.num_val, self.num_test = 200, 10, 31  # number of images in training, validation and test set AFTER discarding
+        self.discard_cases_idx = []
+        self.pad_crop_shape = [512, 512, 32]
+        self.pad_crop_shape_test = [512, 512, 32]
         self.num_workers = 4
         self.torch_device_arg = 'cuda:0'
         if hasattr(args, 'train_batch_size'):
@@ -47,6 +47,7 @@ class VSparams:
         else:
             self.initial_learning_rate = None
         self.epochs_with_const_lr = 100
+        self.lr_divisor = 2.0
         self.weight_decay = 1e-7
         self.num_epochs = 300
         self.val_interval = 2  # determines how frequently validation is performed during training
@@ -111,6 +112,7 @@ class VSparams:
         logger.info('train_batch_size =             {}'.format(self.train_batch_size))
         logger.info('initial_learning_rate =        {}'.format(self.initial_learning_rate))
         logger.info('epochs_with_const_lr =         {}'.format(self.epochs_with_const_lr))
+        logger.info('lr_divisor =                   {}'.format(self.lr_divisor))
         logger.info('weight_decay =                 {}'.format(self.weight_decay))
         logger.info('num_epochs =                   {}'.format(self.num_epochs))
         logger.info('model =                        {}'.format(self.model))
@@ -125,18 +127,20 @@ class VSparams:
         # find and sort all files under the following paths
         if self.dataset == 'T1':
             logger.info('Load T1 data set')
-            all_images = natsorted(glob.glob(os.path.join(self.data_root, 'VS_T1_crop', '*t1.nii.gz')))
-            all_labels = natsorted(glob.glob(os.path.join(self.data_root, 'VS_T1_crop', '*seg.nii.gz')))
+            all_images = natsorted(glob.glob(os.path.join(self.data_root, 'input_data', 'vs_gk_*', 'vs_gk_t1_refT1.nii.gz')))
+            all_labels = natsorted(glob.glob(os.path.join(self.data_root, 'input_data', 'vs_gk_*', 'vs_gk_seg_refT1.nii.gz')))
         elif self.dataset == 'T2':
             logger.info('Load T2 data set')
-            all_images = natsorted(glob.glob(os.path.join(self.data_root, 'VS_T2_crop', '*t2.nii.gz')))
-            all_labels = natsorted(glob.glob(os.path.join(self.data_root, 'VS_T2_crop', '*seg.nii.gz')))
+            all_images = natsorted(glob.glob(os.path.join(self.data_root, 'input_data', 'vs_gk_*', 'vs_gk_t2_refT2.nii.gz')))
+            all_labels = natsorted(glob.glob(os.path.join(self.data_root, 'input_data', 'vs_gk_*', 'vs_gk_seg_refT2.nii.gz')))
         else:
             raise Exception("The dataset '" + self.dataset + "' is not defined.")
 
         assert (len(all_images) == len(all_labels)), "Not the same number of images and labels"
         assert (len(all_images) >= sum((self.num_train, self.num_val, self.num_test, len(self.discard_cases_idx)))), \
-            "Sum of desired training, validation, test and discarded set size is larger than total number of images in data set"
+            f"Sum of desired training ({self.num_train}), validation ({self.num_val}), test ({self.num_test}) " \
+            f"and discarded ({len(self.discard_cases_idx)}) set size is larger than total number of images in data set " \
+            f"({len(all_images)})."
 
         # discard cases
         for i in self.discard_cases_idx:
@@ -245,10 +249,10 @@ class VSparams:
         plt.figure('check', (12, 6))
         plt.subplot(1, 2, 1)
         plt.title('image')
-        plt.imshow(image[:, :, slice_idx], cmap='gray')
+        plt.imshow(image[:, :, slice_idx], cmap='gray', interpolation="none")
         plt.subplot(1, 2, 2)
         plt.title('label')
-        plt.imshow(label[:, :, slice_idx])
+        plt.imshow(label[:, :, slice_idx], interpolation="none")
         plt.savefig(os.path.join(self.figures_path, 'check_validation_image_and_label.png'))
 
     # Set different seed for workers of DataLoader
@@ -369,6 +373,36 @@ class VSparams:
 
     def run_training_algorithm(self, model, loss_function, optimizer, train_loader, val_loader):
         logger = self.logger
+
+        # TensorBoard Writer will output to ./runs/ directory by default
+        tb_writer = SummaryWriter()
+
+        # for i, batch_data in enumerate(train_loader):
+        #     if i >-1:
+        #         test = np.squeeze(batch_data['image'])
+        #         test2 = test.numpy()
+        #         plt.figure()
+        #         plt.imshow(create_mosaic(test2))
+        #         plt.show()
+        #
+        # images_for_grid = []
+        # for batch_data in train_loader:
+        #     images, labels = batch_data['image'], batch_data['label']
+        #
+        #     for image, label in zip(images, labels):
+        #         central_slice_number = self.get_center_of_mass_slice(np.squeeze(label[0, :, :, :]))
+        #         images_for_grid.append(image[..., central_slice_number])
+        #         images_for_grid.append(label[..., central_slice_number])
+        #         plt.figure()
+        #         plt.imshow(np.squeeze(images_for_grid[-2]))
+        #         plt.figure()
+        #         plt.imshow(np.squeeze(images_for_grid[-1]))
+        #         plt.show()
+        #
+        # image_grid = torchvision.utils.make_grid(images_for_grid, normalize=True, scale_each=True)
+        #
+        # tb_writer.add_image('images', image_grid, 0)
+
         epochs_with_const_lr = self.epochs_with_const_lr
         val_interval = self.val_interval  # validation every val_interval epochs
 
@@ -397,7 +431,7 @@ class VSparams:
                 optimizer.zero_grad()  # reset the optimizer gradient
                 outputs = model(inputs)  # evaluate the model
                 # make_dot(outputs.mean(), params=dict(model.named_parameters())).render("attached", format="png")
-                loss = loss_function(outputs, labels)
+                loss = loss_function(outputs, labels)  # returns the mean loss over the batch by default
                 loss.backward()  # computes the gradients
                 optimizer.step()  # update the model weights
                 epoch_loss += loss.item()
@@ -414,20 +448,30 @@ class VSparams:
                 model.eval()
                 with torch.no_grad():  # turns of PyTorch's auto grad for better performance
                     metric_sum = 0.
-                    metric_count = 0
+                    metric_count = 0  # counts number of images
+                    epoch_loss_val = 0
+                    step = 0  # counts number of batches
                     for val_data in val_loader:  # loop over images in validation set
+                        step += 1
                         val_inputs, val_labels = val_data['image'].to(self.device), val_data['label'].to(self.device)
-                        val_outputs = model(val_inputs)[0]
+                        val_outputs = model(val_inputs)
 
                         # value1 = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
                         #                           to_onehot_y=True, mutually_exclusive=True)
 
-                        dice_score = self.compute_dice_score(val_outputs, val_labels)
+                        dice_score = self.compute_dice_score(val_outputs[0], val_labels)
+                        loss = loss_function(val_outputs, val_labels)
 
                         metric_count += len(dice_score)
                         metric_sum += dice_score.sum().item()
+                        epoch_loss_val += loss.item()
+
                     metric = metric_sum / metric_count  # calculate mean Dice score of current epoch for validation set
                     metric_values.append(metric)
+                    epoch_loss_val /= step  # calculate mean loss over current epoch
+
+                    tb_writer.add_scalars("Loss Train/Val", {'train': epoch_loss, 'val': epoch_loss_val}, epoch)
+                    tb_writer.add_scalar("Dice Score Val", metric, epoch)
                     if metric > best_metric:  # if it's the best Dice score so far, proceed to save
                         best_metric = metric
                         best_metric_epoch = epoch + 1
@@ -440,12 +484,13 @@ class VSparams:
             # learning rate update
             if (epoch + 1) % epochs_with_const_lr == 0:
                 for param_group in optimizer.param_groups:
-                    lr_divisor = 2.0
-                    param_group['lr'] = param_group['lr'] / lr_divisor
+                    param_group['lr'] = param_group['lr'] / self.lr_divisor
                     logger.info('Dividing learning rate by {}. '
-                                'New learning rate is: lr = {}'.format(lr_divisor, param_group['lr']))
+                                'New learning rate is: lr = {}'.format(self.lr_divisor, param_group['lr']))
 
         logger.info('Train completed, best_metric: {:.4f}  at epoch: {}'.format(best_metric, best_metric_epoch))
+        torch.save(model.state_dict(), os.path.join(self.model_path, 'last_epoch_model.pth'))
+        logger.info(f'Saved model of the last epoch at: {os.path.join(self.model_path, "last_epoch_model.pth")}')
         return epoch_loss_values, metric_values
 
     def plot_loss_curve_and_mean_dice(self, epoch_loss_values, metric_values):
@@ -491,14 +536,18 @@ class VSparams:
                 plt.figure('check', (18, 6))
                 plt.subplot(1, 3, 1)
                 plt.title('image ' + str(i) + ', slice = ' + str(slice_idx))
-                plt.imshow(data['image'][0, 0, :, :, slice_idx], cmap='gray')
+                plt.imshow(data['image'][0, 0, :, :, slice_idx], cmap='gray', interpolation="none")
                 plt.subplot(1, 3, 2)
                 plt.title('label ' + str(i))
-                plt.imshow(data['label'][0, 0, :, :, slice_idx])
+                plt.imshow(data['label'][0, 0, :, :, slice_idx], interpolation="none")
                 plt.subplot(1, 3, 3)
-                plt.title('output ' + str(i))
-                plt.imshow(torch.argmax(outputs, dim=1).detach().cpu()[0, :, :, slice_idx])
+                plt.title('output ' + str(i) + f', dice = {dice_score.item():.4}')
+                plt.imshow(torch.argmax(outputs, dim=1).detach().cpu()[0, :, :, slice_idx], interpolation="none")
                 plt.savefig(os.path.join(self.figures_path, 'best_model_output_val' + str(i) + '.png'))
+                plt.figure('dice score histogram')
+
+        plt.hist(dice_scores, bins=np.arange(0, 1.01, 0.01))
+        plt.savefig(os.path.join(self.figures_path, 'best_model_output_dice_score_histogram.png'))
 
         logger.info(f"all_dice_scores = {dice_scores}")
         logger.info(f"mean_dice_score = {dice_scores.mean()} +- {dice_scores.std()}")

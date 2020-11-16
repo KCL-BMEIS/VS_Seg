@@ -11,8 +11,8 @@ monai.config.print_config()
 
 # read and configure arguments
 parser = argparse.ArgumentParser(description='Train the model')
-parser.add_argument('--dataset', type=str, default="T1", help='(string) use "T1" or "T2" to select dataset')
-parser.add_argument('--train_batch_size', type=int, default=2, help='batch size of the forward pass')
+parser.add_argument('--dataset', type=str, default="T2", help='(string) use "T1" or "T2" to select dataset')
+parser.add_argument('--train_batch_size', type=int, default=1, help='batch size of the forward pass')
 parser.add_argument('--initial_learning_rate', type=float, default=1e-4, help='learning rate at first epoch')
 parser.add_argument('--no_attention', dest='attention', action='store_false', help='disables the attention module in '
                                                                                    'the network and the attention map '
