@@ -167,7 +167,6 @@ class UNet2d5_spvPA(nn.Module):
         else:
             return conv
 
-
     def _get_upsample_layer(self, in_channels, out_channels, strides, up_kernel_size):
         conv = Convolution(
             self.dimensions,

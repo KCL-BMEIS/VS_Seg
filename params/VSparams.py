@@ -4,6 +4,7 @@ import numpy as np
 from natsort import natsorted
 from time import perf_counter
 import glob
+from time import strftime
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -20,49 +21,71 @@ from .networks.nets.unet import UNet
 from .networks.nets.unet2d5 import UNet2d5
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
 from .losses.dice_spvPA import Dice_spvPA
+from monai.inferers import sliding_window_inference
 
 monai.config.print_config()
 
 
 class VSparams:
 
-    def __init__(self, args):
-        if hasattr(args, 'train_batch_size'):
-            self.dataset = args.dataset
-        else:
-            self.dataset = None
+    def __init__(self, parser):
+        parser.add_argument('--dataset', type=str, default="T2", help='(string) use "T1" or "T2" to select dataset')
+        parser.add_argument('--train_batch_size', type=int, default=1, help='batch size of the forward pass')
+        parser.add_argument('--initial_learning_rate', type=float, default=1e-4, help='learning rate at first epoch')
+        parser.add_argument('--no_attention', dest='attention', action='store_false',
+                            help='disables the attention module in '
+                                 'the network and the attention map '
+                                 'weighting in the loss function')
+        parser.set_defaults(attention=True)
+        parser.add_argument('--no_hardness', dest='hardness', action='store_false',
+                            help='disables the hardness weighting in '
+                                 'the loss function')
+        parser.set_defaults(hardness=True)
+        parser.add_argument('--results_folder_name', type=str, default='temp' + strftime("%Y%m%d%H%M%S"),
+                            help='name of results folder')
+        parser.add_argument('--debug', dest='debug', action='store_true',
+                            help='activate debugging mode')
+        parser.set_defaults(debug=True)
+        args = parser.parse_args()
+
+        self.debug = args.debug
+        self.dataset = args.dataset
         self.data_root = './data/VS_defaced/'  # set path to data set
-        self.num_train, self.num_val, self.num_test = 200, 10, 31  # number of images in training, validation and test set AFTER discarding
+        self.num_train, self.num_val, self.num_test = 176, 20, 46  # number of images in training, validation and test set AFTER discarding
+        if self.debug:
+            self.num_train, self.num_val, self.num_test = 2, 2, 2
         self.discard_cases_idx = []
-        self.pad_crop_shape = [512, 512, 32]
-        self.pad_crop_shape_test = [512, 512, 32]
+        self.pad_crop_shape = [384, 384, 64]
+        if self.debug:
+            self.pad_crop_shape = [256, 256, 32]
+        self.pad_crop_shape_test = [384, 384, 64]
+        if self.debug:
+            self.pad_crop_shape_test = [64, 64, 64]
         self.num_workers = 4
         self.torch_device_arg = 'cuda:0'
-        if hasattr(args, 'train_batch_size'):
-            self.train_batch_size = args.train_batch_size
-        else:
-            self.train_batch_size = None
-        if hasattr(args, 'initial_learning_rate'):
-            self.initial_learning_rate = args.initial_learning_rate
-        else:
-            self.initial_learning_rate = None
+        self.train_batch_size = args.train_batch_size
+        self.initial_learning_rate = args.initial_learning_rate
         self.epochs_with_const_lr = 100
+        if self.debug:
+            self.epochs_with_const_lr = 3
         self.lr_divisor = 2.0
         self.weight_decay = 1e-7
         self.num_epochs = 300
+        if self.debug:
+            self.num_epochs = 10
         self.val_interval = 2  # determines how frequently validation is performed during training
         self.model = "UNet2d5_spvPA"
-        if hasattr(args, 'attention'):
-            self.attention = args.attention
-        else:
-            self.attention = None
-        if hasattr(args, 'hardness'):
-            self.hardness = args.hardness
-        else:
-            self.hardness = None
+        self.use_sliding_window_inferer = True
+        self.sliding_window_inferer_roi_size = [384, 384, 32]
+        if self.debug:
+            self.sliding_window_inferer_roi_size = [256, 256, 32]
+        self.attention = args.attention
+        self.hardness = args.hardness
 
         # paths
         self.results_folder_path = os.path.join(self.data_root, 'results', args.results_folder_name)
+        if self.debug:
+            self.results_folder_path = os.path.join(self.data_root, 'results', 'debug')
         self.logs_path = os.path.join(self.results_folder_path, 'logs')
         self.model_path = os.path.join(self.results_folder_path, 'model')
         self.figures_path = os.path.join(self.results_folder_path, 'figures')
@@ -101,25 +124,29 @@ class VSparams:
         # write all parameters to log
         logger.info('-' * 10)
         logger.info("Parameters: ")
-        logger.info('dataset =                      {}'.format(self.dataset))
-        logger.info('data_root =                    {}'.format(self.data_root))
-        logger.info('num_train, num_val, num_test = {}, {}, {}'.format(self.num_train, self.num_val, self.num_test))
-        logger.info('discard_cases_idx =            {}'.format(self.discard_cases_idx))
-        logger.info('pad_crop_shape =               {}'.format(self.pad_crop_shape))
-        logger.info('pad_crop_shape_test =          {}'.format(self.pad_crop_shape_test))
-        logger.info('num_workers =                  {}'.format(self.num_workers))
-        logger.info('torch_device_arg =             {}'.format(self.torch_device_arg))
-        logger.info('train_batch_size =             {}'.format(self.train_batch_size))
-        logger.info('initial_learning_rate =        {}'.format(self.initial_learning_rate))
-        logger.info('epochs_with_const_lr =         {}'.format(self.epochs_with_const_lr))
-        logger.info('lr_divisor =                   {}'.format(self.lr_divisor))
-        logger.info('weight_decay =                 {}'.format(self.weight_decay))
-        logger.info('num_epochs =                   {}'.format(self.num_epochs))
-        logger.info('model =                        {}'.format(self.model))
-        logger.info('attention =                    {}'.format(self.attention))
-        logger.info('hardness =                     {}'.format(self.hardness))
+        logger.info('dataset =                          {}'.format(self.dataset))
+        logger.info('data_root =                        {}'.format(self.data_root))
+        logger.info('num_train, num_val, num_test =     {}, {}, {}'.format(self.num_train, self.num_val, self.num_test))
+        logger.info('discard_cases_idx =                {}'.format(self.discard_cases_idx))
+        logger.info('pad_crop_shape =                   {}'.format(self.pad_crop_shape))
+        logger.info('pad_crop_shape_test =              {}'.format(self.pad_crop_shape_test))
+        logger.info('num_workers =                      {}'.format(self.num_workers))
+        logger.info('torch_device_arg =                 {}'.format(self.torch_device_arg))
+        logger.info('train_batch_size =                 {}'.format(self.train_batch_size))
+        logger.info('initial_learning_rate =            {}'.format(self.initial_learning_rate))
+        logger.info('epochs_with_const_lr =             {}'.format(self.epochs_with_const_lr))
+        logger.info('lr_divisor =                       {}'.format(self.lr_divisor))
+        logger.info('weight_decay =                     {}'.format(self.weight_decay))
+        logger.info('num_epochs =                       {}'.format(self.num_epochs))
+        logger.info('val_interval =                     {}'.format(self.val_interval))
+        logger.info('model =                            {}'.format(self.model))
+        logger.info('use_sliding_window_inferer =       {}'.format(self.use_sliding_window_inferer))
+        logger.info('sliding_window_inferer_roi_size =  {}'.format(self.sliding_window_inferer_roi_size))
 
-        logger.info('results_folder_path =          {}'.format(self.results_folder_path))
+        logger.info('attention =                        {}'.format(self.attention))
+        logger.info('hardness =                         {}'.format(self.hardness))
+
+        logger.info('results_folder_path =              {}'.format(self.results_folder_path))
         logger.info('-' * 10)
 
     def load_T1_or_T2_data(self):
@@ -206,10 +233,21 @@ class VSparams:
             ToTensord(keys=['image', 'label'])
         ])
 
+        # when the sliding window inferer is used, no padding or cropping of the test data is needed
+        if self.use_sliding_window_inferer:
+            test_transforms = Compose([
+                LoadNiftid(keys=['image', 'label']),
+                AddChanneld(keys=['image', 'label']),
+                Orientationd(keys=['image', 'label'], axcodes='RAS'),
+                NormalizeIntensityd(keys=['image']),
+                ToTensord(keys=['image', 'label'])
+            ])
+
         return train_transforms, val_transforms, test_transforms
 
-    def get_center_of_mass_slice(self, label):
-        # calculate center of mass of label in trough plan direction to select a slice that shows the tumour
+    @staticmethod
+    def get_center_of_mass_slice(label):
+        # calculate center of mass of label in through plan direction to select a slice that shows the tumour
         num_slices = label.shape[2]
         slice_masses = np.zeros(num_slices)
         for z in range(num_slices):
@@ -377,31 +415,17 @@ class VSparams:
         # TensorBoard Writer will output to ./runs/ directory by default
         tb_writer = SummaryWriter()
 
-        # for i, batch_data in enumerate(train_loader):
-        #     if i >-1:
-        #         test = np.squeeze(batch_data['image'])
-        #         test2 = test.numpy()
-        #         plt.figure()
-        #         plt.imshow(create_mosaic(test2))
-        #         plt.show()
-        #
-        # images_for_grid = []
-        # for batch_data in train_loader:
-        #     images, labels = batch_data['image'], batch_data['label']
-        #
-        #     for image, label in zip(images, labels):
-        #         central_slice_number = self.get_center_of_mass_slice(np.squeeze(label[0, :, :, :]))
-        #         images_for_grid.append(image[..., central_slice_number])
-        #         images_for_grid.append(label[..., central_slice_number])
-        #         plt.figure()
-        #         plt.imshow(np.squeeze(images_for_grid[-2]))
-        #         plt.figure()
-        #         plt.imshow(np.squeeze(images_for_grid[-1]))
-        #         plt.show()
-        #
-        # image_grid = torchvision.utils.make_grid(images_for_grid, normalize=True, scale_each=True)
-        #
-        # tb_writer.add_image('images', image_grid, 0)
+        # add an image grid to tensorboard
+        if self.debug:
+            images_for_grid = []
+            for batch_data in train_loader:
+                images, labels = batch_data['image'], batch_data['label']
+                for image, label in zip(images, labels):
+                    central_slice_number = self.get_center_of_mass_slice(np.squeeze(label[0, :, :, :]))
+                    images_for_grid.append(image[..., central_slice_number])
+                    images_for_grid.append(label[..., central_slice_number])
+            image_grid = torchvision.utils.make_grid(images_for_grid, normalize=True, scale_each=True)
+            tb_writer.add_image('images', image_grid, 0)
 
         epochs_with_const_lr = self.epochs_with_const_lr
         val_interval = self.val_interval  # validation every val_interval epochs
@@ -519,10 +543,23 @@ class VSparams:
         logger = self.logger
         model.eval()  # activate evaluation mode of model
         dice_scores = np.zeros(len(data_loader))
-        with torch.no_grad():  # turns of PyTorch's auto grad for better performance
+
+        with torch.no_grad():  # turns off PyTorch's auto grad for better performance
             for i, data in enumerate(data_loader):
                 logger.info('starting image {}'.format(i))
-                outputs = model(data['image'].to(self.device))[0]
+
+                if self.use_sliding_window_inferer:
+                    # sliding window inference
+
+                    outputs = sliding_window_inference(inputs=data['image'].to(self.device),
+                                                       roi_size=self.sliding_window_inferer_roi_size,
+                                                       sw_batch_size=1,
+                                                       predictor=lambda *args, **kwargs: model(*args, **kwargs)[0],
+                                                       mode='gaussian')
+                else:
+                    # run test images directly through model
+                    outputs = model(data['image'].to(self.device))[0]
+
 
                 dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
                 dice_scores[i] = dice_score.item()
@@ -534,6 +571,7 @@ class VSparams:
                 slice_idx = self.get_center_of_mass_slice(
                     label)  # choose slice of selected validation set image volume for the figure
                 plt.figure('check', (18, 6))
+                plt.clf()
                 plt.subplot(1, 3, 1)
                 plt.title('image ' + str(i) + ', slice = ' + str(slice_idx))
                 plt.imshow(data['image'][0, 0, :, :, slice_idx], cmap='gray', interpolation="none")
@@ -544,8 +582,8 @@ class VSparams:
                 plt.title('output ' + str(i) + f', dice = {dice_score.item():.4}')
                 plt.imshow(torch.argmax(outputs, dim=1).detach().cpu()[0, :, :, slice_idx], interpolation="none")
                 plt.savefig(os.path.join(self.figures_path, 'best_model_output_val' + str(i) + '.png'))
-                plt.figure('dice score histogram')
 
+        plt.figure('dice score histogram')
         plt.hist(dice_scores, bins=np.arange(0, 1.01, 0.01))
         plt.savefig(os.path.join(self.figures_path, 'best_model_output_dice_score_histogram.png'))
 
