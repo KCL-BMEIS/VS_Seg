@@ -12,8 +12,8 @@ import torchvision
 from matplotlib import pyplot as plt
 import monai
 from monai.transforms import \
-    Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
-    ToTensord, CenterSpatialCropd
+    Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Spacingd, Orientationd, \
+    ToTensord, CenterSpatialCropd, RandCropByPosNegLabeld, CastToTyped, RandGaussianNoised, RandGaussianSmoothd
 from monai.networks.layers import Norm
 # from torchviz import make_dot
 # import hiddenlayer as hl
@@ -45,7 +45,7 @@ class VSparams:
                             help='name of results folder')
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='activate debugging mode')
-        parser.set_defaults(debug=True)
+        parser.set_defaults(debug=False)
         args = parser.parse_args()
 
         self.debug = args.debug
@@ -53,14 +53,14 @@ class VSparams:
         self.data_root = './data/VS_defaced/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 176, 20, 46  # number of images in training, validation and test set AFTER discarding
         if self.debug:
-            self.num_train, self.num_val, self.num_test = 2, 2, 2
+            self.num_train, self.num_val, self.num_test = 5, 5, 5
         self.discard_cases_idx = []
         self.pad_crop_shape = [384, 384, 64]
         if self.debug:
-            self.pad_crop_shape = [256, 256, 32]
+            self.pad_crop_shape = [128, 128, 32]
         self.pad_crop_shape_test = [384, 384, 64]
         if self.debug:
-            self.pad_crop_shape_test = [64, 64, 64]
+            self.pad_crop_shape_test = [128, 128, 32]
         self.num_workers = 4
         self.torch_device_arg = 'cuda:0'
         self.train_batch_size = args.train_batch_size
@@ -78,7 +78,7 @@ class VSparams:
         self.use_sliding_window_inferer = True
         self.sliding_window_inferer_roi_size = [384, 384, 32]
         if self.debug:
-            self.sliding_window_inferer_roi_size = [256, 256, 32]
+            self.sliding_window_inferer_roi_size = [128, 128, 32]
         self.attention = args.attention
         self.hardness = args.hardness
 
@@ -199,27 +199,47 @@ class VSparams:
         return train_files, val_files, test_files
 
     def get_transforms(self):
+        self.logger.info('Getting transforms...')
         # Setup transforms of data sets
         train_transforms = Compose([
             LoadNiftid(keys=['image', 'label']),
             AddChanneld(keys=['image', 'label']),
+            Spacingd(
+                keys=["image", "label"],
+                pixdim=[0.47, 0.47, 1.5],
+                mode=("bilinear", "nearest")),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
             SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape),
+            RandCropByPosNegLabeld(
+                keys=["image", "label"],
+                label_key="label",
+                spatial_size=self.pad_crop_shape,
+                pos=1,
+                neg=3,
+                num_samples=1,
+                image_key="image",
+                image_threshold=0,
+            ),
+            RandGaussianNoised(keys=["image"], std=0.01, prob=0.15),
+            RandGaussianSmoothd(
+                keys=["image"],
+                sigma_x=(0.5, 1.15),
+                sigma_y=(0.5, 1.15),
+                sigma_z=(0.5, 1.15),
+                prob=0.15,
+            ),
             RandFlipd(keys=['image', 'label'], prob=0.5, spatial_axis=0),
-            RandSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape, random_center=True,
-                             random_size=False),
             ToTensord(keys=['image', 'label'])
         ])
+
         val_transforms = Compose([
             LoadNiftid(keys=['image', 'label']),
             AddChanneld(keys=['image', 'label']),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
-            SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape),
-            RandFlipd(keys=['image', 'label'], prob=0.5, spatial_axis=0),
-            RandSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape, random_center=True,
-                             random_size=False),
+            SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape_test),
+            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape_test),
             ToTensord(keys=['image', 'label'])
         ])
 
@@ -233,8 +253,16 @@ class VSparams:
             ToTensord(keys=['image', 'label'])
         ])
 
-        # when the sliding window inferer is used, no padding or cropping of the test data is needed
+        # when the sliding window inferer is used, no padding or cropping of the val/test data is needed
         if self.use_sliding_window_inferer:
+            val_transforms = Compose([
+                LoadNiftid(keys=['image', 'label']),
+                AddChanneld(keys=['image', 'label']),
+                Orientationd(keys=['image', 'label'], axcodes='RAS'),
+                NormalizeIntensityd(keys=['image']),
+                ToTensord(keys=['image', 'label'])
+            ])
+
             test_transforms = Compose([
                 LoadNiftid(keys=['image', 'label']),
                 AddChanneld(keys=['image', 'label']),
@@ -300,6 +328,7 @@ class VSparams:
         worker_info.dataset.transform.set_random_state(worker_info.seed % (2 ** 32))
 
     def cache_transformed_train_data(self, train_files, train_transforms):
+        self.logger.info('Caching training data set...')
         # Define CacheDataset and DataLoader for training and validation
         train_ds = monai.data.CacheDataset(
             data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=self.num_workers)
@@ -309,18 +338,22 @@ class VSparams:
         return train_loader
 
     def cache_transformed_val_data(self, val_files, val_transforms):
+        self.logger.info('Caching validation data set...')
         val_ds = monai.data.CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0,
                                          num_workers=self.num_workers)
         val_loader = DataLoader(val_ds, batch_size=1, num_workers=self.num_workers)
         return val_loader
 
     def cache_transformed_test_data(self, test_files, test_transforms):
+        self.logger.info('Caching test data set...')
         test_ds = monai.data.CacheDataset(data=test_files, transform=test_transforms, cache_rate=1.0,
                                           num_workers=self.num_workers)
         test_loader = DataLoader(test_ds, batch_size=1, num_workers=self.num_workers)
         return test_loader
 
     def set_and_get_model(self):
+        logger = self.logger
+        logger.info('Setting up the model type...')
 
         if self.model == "UNet":
             model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2,
@@ -368,18 +401,21 @@ class VSparams:
             s = 2
             k = 3
             model = UNet2d5_spvPA(dimensions=3, in_channels=1, out_channels=2,
-                                  channels=(16, 32, 48, 64, 80),
+                                  channels=(16, 32, 48, 64, 80, 96),
                                   strides=((s, s, 1),
                                            (s, s, 1),
+                                           (s, s, s),
                                            (s, s, s),
                                            (s, s, s),),
                                   kernel_sizes=((3, 3, 1),
                                                 (3, 3, 1),
                                                 (3, 3, 3),
                                                 (3, 3, 3),
+                                                (3, 3, 3),
                                                 (3, 3, 3),),
                                   sample_kernel_sizes=((k, k, 1),
                                                        (k, k, 1),
+                                                       (k, k, k),
                                                        (k, k, k),
                                                        (k, k, k),),
                                   num_res_units=2,
@@ -392,11 +428,13 @@ class VSparams:
         return model
 
     def set_and_get_loss_function(self):
+        self.logger.info('Setting up the loss function...')
         loss_function = Dice_spvPA(to_onehot_y=True, softmax=True, supervised_attention=self.attention,
                                    hardness_weighting=self.hardness)
         return loss_function
 
     def set_and_get_optimizer(self, model):
+        self.logger.info('Setting up the optimizer...')
         optimizer = torch.optim.Adam(model.parameters(), lr=self.initial_learning_rate, weight_decay=self.weight_decay)
         return optimizer
 
@@ -411,7 +449,7 @@ class VSparams:
 
     def run_training_algorithm(self, model, loss_function, optimizer, train_loader, val_loader):
         logger = self.logger
-
+        logger.info('Running the training loop...')
         # TensorBoard Writer will output to ./runs/ directory by default
         tb_writer = SummaryWriter()
 
@@ -478,13 +516,28 @@ class VSparams:
                     for val_data in val_loader:  # loop over images in validation set
                         step += 1
                         val_inputs, val_labels = val_data['image'].to(self.device), val_data['label'].to(self.device)
-                        val_outputs = model(val_inputs)
 
                         # value1 = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
                         #                           to_onehot_y=True, mutually_exclusive=True)
 
-                        dice_score = self.compute_dice_score(val_outputs[0], val_labels)
-                        loss = loss_function(val_outputs, val_labels)
+                        if self.model == "UNet2d5_spvPA":
+                            model_segmentation = lambda *args, **kwargs: model(*args, **kwargs)[0]
+                        else:
+                            model_segmentation = model
+
+                        if self.use_sliding_window_inferer:
+                            # sliding window inference
+
+                            val_outputs = sliding_window_inference(inputs=val_inputs,
+                                                                   roi_size=self.sliding_window_inferer_roi_size,
+                                                                   sw_batch_size=1,
+                                                                   predictor=model_segmentation,
+                                                                   mode='gaussian')
+                        else:
+                            # run test images directly through model
+                            outputs = model_segmentation(val_inputs)
+
+                        dice_score = self.compute_dice_score(val_outputs, val_labels)
 
                         metric_count += len(dice_score)
                         metric_sum += dice_score.sum().item()
@@ -541,6 +594,8 @@ class VSparams:
 
     def run_inference(self, model, data_loader):
         logger = self.logger
+        logger.info('Running inference...')
+
         model.eval()  # activate evaluation mode of model
         dice_scores = np.zeros(len(data_loader))
 
@@ -548,17 +603,22 @@ class VSparams:
             for i, data in enumerate(data_loader):
                 logger.info('starting image {}'.format(i))
 
+                if self.model == "UNet2d5_spvPA":
+                    model_segmentation = lambda *args, **kwargs: model(*args, **kwargs)[0]
+                else:
+                    model_segmentation = model
+
                 if self.use_sliding_window_inferer:
                     # sliding window inference
 
                     outputs = sliding_window_inference(inputs=data['image'].to(self.device),
                                                        roi_size=self.sliding_window_inferer_roi_size,
                                                        sw_batch_size=1,
-                                                       predictor=lambda *args, **kwargs: model(*args, **kwargs)[0],
+                                                       predictor=model_segmentation,
                                                        mode='gaussian')
                 else:
                     # run test images directly through model
-                    outputs = model(data['image'].to(self.device))[0]
+                    outputs = model_segmentation(data['image'].to(self.device))
 
 
                 dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
