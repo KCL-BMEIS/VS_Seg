@@ -12,8 +12,8 @@ import torchvision
 from matplotlib import pyplot as plt
 import monai
 from monai.transforms import \
-    Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Spacingd, Orientationd, \
-    ToTensord, CenterSpatialCropd, RandCropByPosNegLabeld, CastToTyped, RandGaussianNoised, RandGaussianSmoothd
+    Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
+    ToTensord, CenterSpatialCropd
 from monai.networks.layers import Norm
 # from torchviz import make_dot
 # import hiddenlayer as hl
@@ -29,6 +29,10 @@ monai.config.print_config()
 class VSparams:
 
     def __init__(self, parser):
+        parser.add_argument('--debug', dest='debug', action='store_true',
+                            help='activate debugging mode')
+        parser.set_defaults(debug=False)
+
         parser.add_argument('--dataset', type=str, default="T2", help='(string) use "T1" or "T2" to select dataset')
         parser.add_argument('--train_batch_size', type=int, default=1, help='batch size of the forward pass')
         parser.add_argument('--initial_learning_rate', type=float, default=1e-4, help='learning rate at first epoch')
@@ -43,9 +47,7 @@ class VSparams:
         parser.set_defaults(hardness=True)
         parser.add_argument('--results_folder_name', type=str, default='temp' + strftime("%Y%m%d%H%M%S"),
                             help='name of results folder')
-        parser.add_argument('--debug', dest='debug', action='store_true',
-                            help='activate debugging mode')
-        parser.set_defaults(debug=False)
+
         args = parser.parse_args()
 
         self.debug = args.debug
@@ -76,7 +78,7 @@ class VSparams:
         self.val_interval = 2  # determines how frequently validation is performed during training
         self.model = "UNet2d5_spvPA"
         self.use_sliding_window_inferer = True
-        self.sliding_window_inferer_roi_size = [384, 384, 32]
+        self.sliding_window_inferer_roi_size = [384, 384, 64]
         if self.debug:
             self.sliding_window_inferer_roi_size = [128, 128, 32]
         self.attention = args.attention
@@ -204,32 +206,12 @@ class VSparams:
         train_transforms = Compose([
             LoadNiftid(keys=['image', 'label']),
             AddChanneld(keys=['image', 'label']),
-            Spacingd(
-                keys=["image", "label"],
-                pixdim=[0.47, 0.47, 1.5],
-                mode=("bilinear", "nearest")),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
             SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape),
-            RandCropByPosNegLabeld(
-                keys=["image", "label"],
-                label_key="label",
-                spatial_size=self.pad_crop_shape,
-                pos=1,
-                neg=3,
-                num_samples=1,
-                image_key="image",
-                image_threshold=0,
-            ),
-            RandGaussianNoised(keys=["image"], std=0.01, prob=0.15),
-            RandGaussianSmoothd(
-                keys=["image"],
-                sigma_x=(0.5, 1.15),
-                sigma_y=(0.5, 1.15),
-                sigma_z=(0.5, 1.15),
-                prob=0.15,
-            ),
             RandFlipd(keys=['image', 'label'], prob=0.5, spatial_axis=0),
+            RandSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape, random_center=True,
+                             random_size=False),
             ToTensord(keys=['image', 'label'])
         ])
 
@@ -444,7 +426,7 @@ class VSparams:
         y_pred = monai.networks.utils.one_hot(y_pred, n_classes)  # make 2 channel one hot tensor
         dice_score = torch.tensor(
             [[1 - monai.losses.DiceLoss(include_background=False, to_onehot_y=True, softmax=False,
-                                        reduction="mean").forward(y_pred, label, smooth=1e-5)]], device=self.device)
+                                        reduction="mean").forward(y_pred, label)]], device=self.device)
         return dice_score
 
     def run_training_algorithm(self, model, loss_function, optimizer, train_loader, val_loader):
@@ -535,7 +517,7 @@ class VSparams:
                                                                    mode='gaussian')
                         else:
                             # run test images directly through model
-                            outputs = model_segmentation(val_inputs)
+                            val_outputs = model_segmentation(val_inputs)
 
                         dice_score = self.compute_dice_score(val_outputs, val_labels)
 
@@ -599,14 +581,14 @@ class VSparams:
         model.eval()  # activate evaluation mode of model
         dice_scores = np.zeros(len(data_loader))
 
+        if self.model == "UNet2d5_spvPA":
+            model_segmentation = lambda *args, **kwargs: model(*args, **kwargs)[0]
+        else:
+            model_segmentation = model
+
         with torch.no_grad():  # turns off PyTorch's auto grad for better performance
             for i, data in enumerate(data_loader):
                 logger.info('starting image {}'.format(i))
-
-                if self.model == "UNet2d5_spvPA":
-                    model_segmentation = lambda *args, **kwargs: model(*args, **kwargs)[0]
-                else:
-                    model_segmentation = model
 
                 if self.use_sliding_window_inferer:
                     # sliding window inference
@@ -619,7 +601,6 @@ class VSparams:
                 else:
                     # run test images directly through model
                     outputs = model_segmentation(data['image'].to(self.device))
-
 
                 dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
                 dice_scores[i] = dice_score.item()
