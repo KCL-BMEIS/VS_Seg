@@ -13,12 +13,10 @@ from matplotlib import pyplot as plt
 import monai
 from monai.transforms import \
     Compose, LoadNiftid, AddChanneld, NormalizeIntensityd, SpatialPadd, RandFlipd, RandSpatialCropd, Orientationd, \
-    ToTensord, CenterSpatialCropd
+    ToTensord
 from monai.networks.layers import Norm
 # from torchviz import make_dot
 # import hiddenlayer as hl
-from .networks.nets.unet import UNet
-from .networks.nets.unet2d5 import UNet2d5
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
 from .losses.dice_spvPA import Dice_spvPA
 from monai.inferers import sliding_window_inference
@@ -31,7 +29,7 @@ class VSparams:
     def __init__(self, parser):
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='activate debugging mode')
-        parser.set_defaults(debug=False)
+        parser.set_defaults(debug=True)
 
         parser.add_argument('--dataset', type=str, default="T2", help='(string) use "T1" or "T2" to select dataset')
         parser.add_argument('--train_batch_size', type=int, default=1, help='batch size of the forward pass')
@@ -55,7 +53,7 @@ class VSparams:
         self.data_root = './data/VS_defaced/'  # set path to data set
         self.num_train, self.num_val, self.num_test = 176, 20, 46  # number of images in training, validation and test set AFTER discarding
         if self.debug:
-            self.num_train, self.num_val, self.num_test = 5, 5, 5
+            self.num_train, self.num_val, self.num_test = 2, 2, 2
         self.discard_cases_idx = []
         self.pad_crop_shape = [384, 384, 64]
         if self.debug:
@@ -77,7 +75,6 @@ class VSparams:
             self.num_epochs = 10
         self.val_interval = 2  # determines how frequently validation is performed during training
         self.model = "UNet2d5_spvPA"
-        self.use_sliding_window_inferer = True
         self.sliding_window_inferer_roi_size = [384, 384, 64]
         if self.debug:
             self.sliding_window_inferer_roi_size = [128, 128, 32]
@@ -142,7 +139,6 @@ class VSparams:
         logger.info('num_epochs =                       {}'.format(self.num_epochs))
         logger.info('val_interval =                     {}'.format(self.val_interval))
         logger.info('model =                            {}'.format(self.model))
-        logger.info('use_sliding_window_inferer =       {}'.format(self.use_sliding_window_inferer))
         logger.info('sliding_window_inferer_roi_size =  {}'.format(self.sliding_window_inferer_roi_size))
 
         logger.info('attention =                        {}'.format(self.attention))
@@ -220,8 +216,6 @@ class VSparams:
             AddChanneld(keys=['image', 'label']),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
-            SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape_test),
-            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape_test),
             ToTensord(keys=['image', 'label'])
         ])
 
@@ -230,28 +224,8 @@ class VSparams:
             AddChanneld(keys=['image', 'label']),
             Orientationd(keys=['image', 'label'], axcodes='RAS'),
             NormalizeIntensityd(keys=['image']),
-            SpatialPadd(keys=['image', 'label'], spatial_size=self.pad_crop_shape_test),
-            CenterSpatialCropd(keys=['image', 'label'], roi_size=self.pad_crop_shape_test),
             ToTensord(keys=['image', 'label'])
         ])
-
-        # when the sliding window inferer is used, no padding or cropping of the val/test data is needed
-        if self.use_sliding_window_inferer:
-            val_transforms = Compose([
-                LoadNiftid(keys=['image', 'label']),
-                AddChanneld(keys=['image', 'label']),
-                Orientationd(keys=['image', 'label'], axcodes='RAS'),
-                NormalizeIntensityd(keys=['image']),
-                ToTensord(keys=['image', 'label'])
-            ])
-
-            test_transforms = Compose([
-                LoadNiftid(keys=['image', 'label']),
-                AddChanneld(keys=['image', 'label']),
-                Orientationd(keys=['image', 'label'], axcodes='RAS'),
-                NormalizeIntensityd(keys=['image']),
-                ToTensord(keys=['image', 'label'])
-            ])
 
         return train_transforms, val_transforms, test_transforms
 
@@ -337,74 +311,33 @@ class VSparams:
         logger = self.logger
         logger.info('Setting up the model type...')
 
-        if self.model == "UNet":
-            model = monai.networks.nets.UNet(dimensions=3, in_channels=1, out_channels=2,
-                                             channels=(16, 32, 48, 64, 80),
-                                             strides=(2, 2, 2, 2),
-                                             num_res_units=2, norm=Norm.BATCH).to(self.device)
-        elif self.model == "UNet_loc":
-            model = UNet(dimensions=3, in_channels=1, out_channels=2,
-                                             channels=(16, 32, 48, 64, 80),
-                                             kernel_sizes=((3, 3, 1),
-                                                           (3, 3, 1),
-                                                           (3, 3, 3),
-                                                           (3, 3, 3),
-                                                           (3, 3, 3),),
-                                             strides=((2, 2, 1),
-                                                      (2, 2, 1),
-                                                      (2, 2, 2),
-                                                      (2, 2, 2)),
-                                             num_res_units=2, norm=Norm.BATCH).to(self.device)
+        if self.model == "UNet2d5_spvPA":
 
-        elif self.model == "UNet2d5":
-            s = 2
-            k = 3
-            model = UNet2d5(dimensions=3, in_channels=1, out_channels=2,
-                            channels=(16, 32, 48, 64, 80),
-                            strides=((s, s, 1),
-                                     (s, s, 1),
-                                     (s, s, s),
-                                     (s, s, s),),
-                            kernel_sizes=((3, 3, 1),
-                                          (3, 3, 1),
-                                          (3, 3, 3),
-                                          (3, 3, 3),
-                                          (3, 3, 3),),
-                            sample_kernel_sizes=((k, k, 1),
-                                                 (k, k, 1),
-                                                 (k, k, k),
-                                                 (k, k, k),),
-                            num_res_units=2,
-                            norm=Norm.BATCH,
-                            dropout=0.1
-                            ).to(self.device)
-
-        elif self.model == "UNet2d5_spvPA":
-            s = 2
-            k = 3
             model = UNet2d5_spvPA(dimensions=3, in_channels=1, out_channels=2,
                                   channels=(16, 32, 48, 64, 80, 96),
-                                  strides=((s, s, 1),
-                                           (s, s, 1),
-                                           (s, s, s),
-                                           (s, s, s),
-                                           (s, s, s),),
+                                  strides=((2, 2, 1),
+                                           (2, 2, 1),
+                                           (2, 2, 2),
+                                           (2, 2, 2),
+                                           (2, 2, 2),),
                                   kernel_sizes=((3, 3, 1),
                                                 (3, 3, 1),
                                                 (3, 3, 3),
                                                 (3, 3, 3),
                                                 (3, 3, 3),
                                                 (3, 3, 3),),
-                                  sample_kernel_sizes=((k, k, 1),
-                                                       (k, k, 1),
-                                                       (k, k, k),
-                                                       (k, k, k),
-                                                       (k, k, k),),
+                                  sample_kernel_sizes=((3, 3, 1),
+                                                       (3, 3, 1),
+                                                       (3, 3, 3),
+                                                       (3, 3, 3),
+                                                       (3, 3, 3),),
                                   num_res_units=2,
                                   norm=Norm.BATCH,
                                   dropout=0.1,
                                   attention_module=self.attention,
                                   ).to(self.device)
+        else:
+            raise Exception("Model not defined.")
 
         # hl.build_graph(model, torch.zeros(2, 1, 128, 128, 32).to(self.device)).save("model")
         return model
@@ -507,17 +440,11 @@ class VSparams:
                         else:
                             model_segmentation = model
 
-                        if self.use_sliding_window_inferer:
-                            # sliding window inference
-
-                            val_outputs = sliding_window_inference(inputs=val_inputs,
-                                                                   roi_size=self.sliding_window_inferer_roi_size,
-                                                                   sw_batch_size=1,
-                                                                   predictor=model_segmentation,
-                                                                   mode='gaussian')
-                        else:
-                            # run test images directly through model
-                            val_outputs = model_segmentation(val_inputs)
+                        val_outputs = sliding_window_inference(inputs=val_inputs,
+                                                               roi_size=self.sliding_window_inferer_roi_size,
+                                                               sw_batch_size=1,
+                                                               predictor=model_segmentation,
+                                                               mode='gaussian')
 
                         dice_score = self.compute_dice_score(val_outputs, val_labels)
 
@@ -590,17 +517,11 @@ class VSparams:
             for i, data in enumerate(data_loader):
                 logger.info('starting image {}'.format(i))
 
-                if self.use_sliding_window_inferer:
-                    # sliding window inference
-
-                    outputs = sliding_window_inference(inputs=data['image'].to(self.device),
-                                                       roi_size=self.sliding_window_inferer_roi_size,
-                                                       sw_batch_size=1,
-                                                       predictor=model_segmentation,
-                                                       mode='gaussian')
-                else:
-                    # run test images directly through model
-                    outputs = model_segmentation(data['image'].to(self.device))
+                outputs = sliding_window_inference(inputs=data['image'].to(self.device),
+                                                   roi_size=self.sliding_window_inferer_roi_size,
+                                                   sw_batch_size=1,
+                                                   predictor=model_segmentation,
+                                                   mode='gaussian')
 
                 dice_score = self.compute_dice_score(outputs, data['label'].to(self.device))
                 dice_scores[i] = dice_score.item()
