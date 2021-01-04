@@ -64,7 +64,7 @@ The following setup has been tested on Ubuntu 20.04.
 After downloading the repository VS_Seg, create a folder VS_Seg/data and place your data in it, 
 e.g. the folder VS_defaced which contains the data as shown in the figure below.
 
-<img src="figures/model_sketch.png" width="150" height="200">
+<img src="figures/folder_structure.png" width="150" height="200">
 
 In case, the folder structure or file names are different from the suggested one, or to exclude cases follow
 these instructions:
