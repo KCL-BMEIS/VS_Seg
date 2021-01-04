@@ -1,0 +1,8 @@
+pydicom~=2.0.0
+numpy~=1.19.0
+nibabel~=3.1.1
+matplotlib~=3.3.3
+natsort~=7.0.1
+torch~=1.6.0
+git+https://github.com/Project-MONAI/MONAI.git@0b415f09db82a39f1df5bafd9b8ff67f9f3f677c
+torchvision~=0.7.0
