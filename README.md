@@ -59,6 +59,10 @@ The following setup has been tested on Ubuntu 20.04.
 * torchvision (recommended: 0.7.0)
         
         pip install torchvision
+
+* tensorboard (recommended: 2.3.0)
+  
+        pip install tensorboard
         
 ## How to store/access the data
 After downloading the repository VS_Seg, create a folder VS_Seg/data and place your data in it, 
