@@ -71,11 +71,11 @@ def loadCheckedLoadables(self):
     referencedFileLists = []
     for plugin in self.loadablesByPlugin:
         for loadable in self.loadablesByPlugin[plugin]:
-            if hasattr(loadable, 'referencedInstanceUIDs'):
+            if hasattr(loadable, "referencedInstanceUIDs"):
                 instanceFileList = []
                 for instance in loadable.referencedInstanceUIDs:
                     instanceFile = slicer.dicomDatabase.fileForInstance(instance)
-                    if instanceFile != '':
+                    if instanceFile != "":
                         instanceFileList.append(instanceFile)
                 if len(instanceFileList) and not self.isFileListInCheckedLoadables(instanceFileList):
                     referencedFileLists.append(instanceFileList)
@@ -86,7 +86,8 @@ def loadCheckedLoadables(self):
         (self.referencedLoadables, loadEnabled) = self.getLoadablesFromFileLists(referencedFileLists)
 
     automaticallyLoadReferences = int(
-        slicer.util.settingsValue('DICOM/automaticallyLoadReferences', qt.QMessageBox.InvalidRole))
+        slicer.util.settingsValue("DICOM/automaticallyLoadReferences", qt.QMessageBox.InvalidRole)
+    )
     if slicer.app.commandOptions().testingEnabled:
         automaticallyLoadReferences = qt.QMessageBox.No
     if loadEnabled and automaticallyLoadReferences == qt.QMessageBox.InvalidRole:
@@ -131,7 +132,7 @@ def import_T1_and_T2_data(input_folder, case_number):
     to_load = []
     for key in loadables:
         name = loadables[key].name
-        if 'RTSTRUCT' in name or (('t1_' in name or 't2_' in name) and not ' MR ' in name):
+        if "RTSTRUCT" in name or (("t1_" in name or "t2_" in name) and not " MR " in name):
             loadables[key].selected = True
             counter += 1
             to_load.append(loadables[key].name)
@@ -140,8 +141,10 @@ def import_T1_and_T2_data(input_folder, case_number):
             loadables[key].selected = False
 
     # check if exactly 4 loadables (2 images and 2 RT structures were selected)
-    assert (counter == 4), f"Not exactly 4, but {counter} files selected for loading of case {case_number}. \n" \
-                           f"Selected files are {to_load}"
+    assert counter == 4, (
+        f"Not exactly 4, but {counter} files selected for loading of case {case_number}. \n"
+        f"Selected files are {to_load}"
+    )
 
     # perform loading operation
     loadCheckedLoadables(dicomWidget.browserWidget)
@@ -153,14 +156,14 @@ def import_T1_and_T2_data(input_folder, case_number):
     ### now in slicer data module ###
 
     # get RT structure nodes
-    ns = getNodesByClass('vtkMRMLSegmentationNode')  # gets the nodes that correspond to RT structures
+    ns = getNodesByClass("vtkMRMLSegmentationNode")  # gets the nodes that correspond to RT structures
 
-    assert (len(ns) == 2), f"Not exactly 2, but {len(ns)} node of class vtkMRMLSegmentationNode."
+    assert len(ns) == 2, f"Not exactly 2, but {len(ns)} node of class vtkMRMLSegmentationNode."
     RTSS1 = ns[0]  # picks the first RT structure
     RTSS2 = ns[1]
 
-    ref1 = RTSS1.GetNodeReference('referenceImageGeometryRef')
-    ref2 = RTSS2.GetNodeReference('referenceImageGeometryRef')
+    ref1 = RTSS1.GetNodeReference("referenceImageGeometryRef")
+    ref2 = RTSS2.GetNodeReference("referenceImageGeometryRef")
 
     ref1_name = ref1.GetName()
     ref2_name = ref2.GetName()
@@ -170,9 +173,9 @@ def import_T1_and_T2_data(input_folder, case_number):
 
     # make sure that 1-variables are always related to T1 image/segmentation
     if "t1_" in ref1_name and "t2_" in ref2_name:
-        print('T1 first')
+        print("T1 first")
     elif "t2_" in ref1_name and "t1_" in ref2_name:
-        print('T2 first')
+        print("T2 first")
         RTSS1, RTSS2 = RTSS2, RTSS1
         ref1, ref2 = ref2, ref1
     else:
@@ -181,7 +184,7 @@ def import_T1_and_T2_data(input_folder, case_number):
     return ref1, ref2, RTSS1, RTSS2
 
 
-def register_and_resample(input_node, reference_node, transform_node=None, interpolationMode='Linear'):
+def register_and_resample(input_node, reference_node, transform_node=None, interpolationMode="Linear"):
     # when loaded with slicer, the matrix in tfm file is multiplied with LPS_to_RAS transforms from both sides
     # furthermore the transformNode will be set to FromParent instead of ToParent, which has the same effect
     # as inverting it before application to the volume node
@@ -198,14 +201,16 @@ def register_and_resample(input_node, reference_node, transform_node=None, inter
 
     # resample volume
     registered_and_resampled_node = slicer.mrmlScene.AddNewNodeByClass(copy_input_node.GetClassName())
-    parameters = {'inputVolume': copy_input_node,
-                  'referenceVolume': reference_node,
-                  'outputVolume': registered_and_resampled_node,
-                  'interpolationMode': interpolationMode,
-                  'defaultValue': 0.0}
+    parameters = {
+        "inputVolume": copy_input_node,
+        "referenceVolume": reference_node,
+        "outputVolume": registered_and_resampled_node,
+        "interpolationMode": interpolationMode,
+        "defaultValue": 0.0,
+    }
     slicer.cli.run(slicer.modules.brainsresample, None, parameters, wait_for_completion=True)
     slicer.mrmlScene.RemoveNode(copy_input_node)  # remove temporary copy of input node
-    registered_and_resampled_node.SetName(input_node.GetName() + '_registered_and_resampled')
+    registered_and_resampled_node.SetName(input_node.GetName() + "_registered_and_resampled")
     return registered_and_resampled_node
 
 
@@ -229,13 +234,13 @@ def createSegNodeFromContourPoints(segmentationNode, contours, name):
     segment = slicer.vtkSegment()
     segment.SetName(name)
     # segment.SetColor(segmentColor)
-    segment.AddRepresentation('Planar contour', contoursPolyData)
-    segmentationNode.GetSegmentation().SetMasterRepresentationName('Planar contour')
+    segment.AddRepresentation("Planar contour", contoursPolyData)
+    segmentationNode.GetSegmentation().SetMasterRepresentationName("Planar contour")
     segmentationNode.GetSegmentation().AddSegment(segment)
 
 
 def load_LPS_contour_points(json_file_path):
-    with open(json_file_path, 'r') as json_file:
+    with open(json_file_path, "r") as json_file:
         structure_contour_list = json.load(json_file)
     return structure_contour_list
 
@@ -260,7 +265,7 @@ def create_segments_from_structure_contour_list(segmentationNode, structure_cont
     RAS_to_LPS = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0]])
     for i, struc in enumerate(structure_contour_list):
         # select a structure
-        contours = struc['LPS_contour_points']
+        contours = struc["LPS_contour_points"]
 
         # transform contours from LPS to RAS
         contours_RAS = []
@@ -268,14 +273,17 @@ def create_segments_from_structure_contour_list(segmentationNode, structure_cont
             contours_RAS.append(transform_contour_points(RAS_to_LPS, region))
 
         # create segment from contours_RAS in segmentationNode
-        createSegNodeFromContourPoints(segmentationNode, contours_RAS, struc['structure_name'])
+        createSegNodeFromContourPoints(segmentationNode, contours_RAS, struc["structure_name"])
 
 
-def save_labelmaps_from_planar_contour(planar_contour_segmentation_node, ref, export_only_tumour_seg, case_number, output_folder):
+def save_labelmaps_from_planar_contour(
+    planar_contour_segmentation_node, ref, export_only_tumour_seg, case_number, output_folder
+):
     pc_node = planar_contour_segmentation_node
     segmentIDs = vtk.vtkStringArray()  # create new array
     pc_node.GetSegmentation().GetSegmentIDs(
-        segmentIDs)  # save IDs of all Segmentations in segmentIDs array, e.g. skull, tumor, cochlea
+        segmentIDs
+    )  # save IDs of all Segmentations in segmentIDs array, e.g. skull, tumor, cochlea
     lm_nodes = []
 
     if export_only_tumour_seg:
@@ -293,38 +301,39 @@ def save_labelmaps_from_planar_contour(planar_contour_segmentation_node, ref, ex
         segmentID_a.SetValue(0, segmentID)  # define first value by segmentID
 
         # Creating a Label Map nodes that will store the binary segmentation
-        lm_node = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
+        lm_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLabelMapVolumeNode")
 
         # arguments: input node, Segmentation ID (skull?), new label map node, reference volume)
-        slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(pc_node,
-                                                                          segmentID_a,
-                                                                          lm_node,
-                                                                          ref)
+        slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(pc_node, segmentID_a, lm_node, ref)
 
         # specialcharacters to remove from output filename (they could come from name of segmented structure)
-        charsRoRemove = ['!', '?', ':', ';', '*', ' ']
+        charsRoRemove = ["!", "?", ":", ";", "*", " "]
 
         # create filenames and remove special characters from output filename (they could come from name of segmented structure)
         if export_only_tumour_seg:
             if "t1_" in ref.GetName():
-                fileName_rt = os.path.join(output_folder, f'vs_gk_{case_number}',
-                                           f"vs_gk_seg" + '_refT1.nii.gz').translate(
-                    {ord(i): None for i in charsRoRemove})
+                fileName_rt = os.path.join(
+                    output_folder, f"vs_gk_{case_number}", f"vs_gk_seg" + "_refT1.nii.gz"
+                ).translate({ord(i): None for i in charsRoRemove})
             elif "t2_" in ref.GetName():
-                fileName_rt = os.path.join(output_folder, f'vs_gk_{case_number}',
-                                           f"vs_gk_seg" + '_refT2.nii.gz').translate(
-                    {ord(i): None for i in charsRoRemove})
+                fileName_rt = os.path.join(
+                    output_folder, f"vs_gk_{case_number}", f"vs_gk_seg" + "_refT2.nii.gz"
+                ).translate({ord(i): None for i in charsRoRemove})
             else:
                 raise Exception("Reference volume not valid.")
         else:
             if "t1_" in ref.GetName():
-                fileName_rt = os.path.join(output_folder, f'vs_gk_{case_number}',
-                                           f"vs_gk_struc{segmentIndex + 1}_" + segmentID + '_refT1.nii.gz').translate(
-                    {ord(i): None for i in charsRoRemove})
+                fileName_rt = os.path.join(
+                    output_folder,
+                    f"vs_gk_{case_number}",
+                    f"vs_gk_struc{segmentIndex + 1}_" + segmentID + "_refT1.nii.gz",
+                ).translate({ord(i): None for i in charsRoRemove})
             elif "t2_" in ref.GetName():
-                fileName_rt = os.path.join(output_folder, f'vs_gk_{case_number}',
-                                           f"vs_gk_struc{segmentIndex + 1}_" + segmentID + '_refT2.nii.gz').translate(
-                    {ord(i): None for i in charsRoRemove})
+                fileName_rt = os.path.join(
+                    output_folder,
+                    f"vs_gk_{case_number}",
+                    f"vs_gk_struc{segmentIndex + 1}_" + segmentID + "_refT2.nii.gz",
+                ).translate({ord(i): None for i in charsRoRemove})
             else:
                 raise Exception("Reference volume not valid.")
 
@@ -338,33 +347,49 @@ def save_labelmaps_from_planar_contour(planar_contour_segmentation_node, ref, ex
 def main(argv):
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Batch Structure Set Conversion")
-    parser.add_argument("-i", "--input-folder", dest="input_folder", metavar="PATH",
-                        default="-", required=True,
-                        help="Folder of input DICOM study (or database path to use existing)")
-    parser.add_argument("-o", "--output-folder", dest="output_folder", metavar="PATH",
-                        default=".", help="Folder for output labelmaps")
-    parser.add_argument("-r", "--register", dest="register", metavar="PATH", default="no_registration",
-                        help='"T1" for registration to T1 image, "T2" for registration to T2 image. '
-                             'Defaults to "no_registration".')
-    parser.add_argument("--export_all_structures", dest="export_all_structures", action='store_true',
-                        help="All available structures will be exported. By default, only the VS is exported.")
+    parser.add_argument(
+        "-i",
+        "--input-folder",
+        dest="input_folder",
+        metavar="PATH",
+        default="-",
+        required=True,
+        help="Folder of input DICOM study (or database path to use existing)",
+    )
+    parser.add_argument(
+        "-o", "--output-folder", dest="output_folder", metavar="PATH", default=".", help="Folder for output labelmaps"
+    )
+    parser.add_argument(
+        "-r",
+        "--register",
+        dest="register",
+        metavar="PATH",
+        default="no_registration",
+        help='"T1" for registration to T1 image, "T2" for registration to T2 image. ' 'Defaults to "no_registration".',
+    )
+    parser.add_argument(
+        "--export_all_structures",
+        dest="export_all_structures",
+        action="store_true",
+        help="All available structures will be exported. By default, only the VS is exported.",
+    )
     parser.set_defaults(export_all_structures=False)
 
     args = parser.parse_args(argv)
 
     # Check required arguments
     if args.input_folder == "-":
-        logging.warning('Please specify input DICOM study folder!')
+        logging.warning("Please specify input DICOM study folder!")
     if args.output_folder == ".":
         logging.info(
-            'Current directory is selected as output folder (default). To change it, please specify --output-folder')
+            "Current directory is selected as output folder (default). To change it, please specify --output-folder"
+        )
     if args.register not in ["no_registration", "T1", "T2"]:
         logging.error('Invalid value for keyword "--register": choose "T1" or "T2" or "no_registration"')
 
-
     # Convert to python path style
-    input_folder = args.input_folder.replace('\\', '/')
-    output_folder = args.output_folder.replace('\\', '/')
+    input_folder = args.input_folder.replace("\\", "/")
+    output_folder = args.output_folder.replace("\\", "/")
     register = args.register
     export_all_structures = args.export_all_structures
 
@@ -417,37 +442,41 @@ def main(argv):
         ## REGISTRATION
 
         if register_T1_image_and_contour_points_to_T2_image:
-            transform_path = os.path.join(input_folder, f'vs_gk_{case_number}' + '_t1', 'inv_T1_LPS_to_T2_LPS.tfm')
-            transformNode = slicer.util.loadNodeFromFile(transform_path, filetype='TransformFile')
-            ref1 = register_and_resample(input_node=ref1, reference_node=ref2, transform_node=transformNode,
-                                         interpolationMode='Linear')
+            transform_path = os.path.join(input_folder, f"vs_gk_{case_number}" + "_t1", "inv_T1_LPS_to_T2_LPS.tfm")
+            transformNode = slicer.util.loadNodeFromFile(transform_path, filetype="TransformFile")
+            ref1 = register_and_resample(
+                input_node=ref1, reference_node=ref2, transform_node=transformNode, interpolationMode="Linear"
+            )
             # also transform contour points
             RTSS1.SetAndObserveTransformNodeID(transformNode.GetID())
 
         elif register_T2_image_and_contour_points_to_T1_image:
-            transform_path = os.path.join(input_folder, f'vs_gk_{case_number}' + '_t2', 'inv_T2_LPS_to_T1_LPS.tfm')
-            transformNode = slicer.util.loadNodeFromFile(transform_path, filetype='TransformFile')
-            ref2 = register_and_resample(input_node=ref2, reference_node=ref1, transform_node=transformNode,
-                                         interpolationMode='Linear')
+            transform_path = os.path.join(input_folder, f"vs_gk_{case_number}" + "_t2", "inv_T2_LPS_to_T1_LPS.tfm")
+            transformNode = slicer.util.loadNodeFromFile(transform_path, filetype="TransformFile")
+            ref2 = register_and_resample(
+                input_node=ref2, reference_node=ref1, transform_node=transformNode, interpolationMode="Linear"
+            )
             # also transform contour points
             RTSS2.SetAndObserveTransformNodeID(transformNode.GetID())
 
         ## Create segments from contour files
         # Create segmentation node where we will store segments
-        segmentationNode_T1 = \
-            create_segmentation_node_with_reference_geometry('SegmentationFromContourPoints_refT1', \
-                                                             ref_geometry_image_node=ref1)
-        segmentationNode_T2 = \
-            create_segmentation_node_with_reference_geometry('SegmentationFromContourPoints_refT2', \
-                                                             ref_geometry_image_node=ref2)
+        segmentationNode_T1 = create_segmentation_node_with_reference_geometry(
+            "SegmentationFromContourPoints_refT1", ref_geometry_image_node=ref1
+        )
+        segmentationNode_T2 = create_segmentation_node_with_reference_geometry(
+            "SegmentationFromContourPoints_refT2", ref_geometry_image_node=ref2
+        )
 
         # load structure contour list from json file
         # these are registered to original T1 and T2 images (they are not affected by registrations of the ref_geometry
         # node, which only defines extent and the IJK to RAS transformation)
-        structure_contour_list_T1 = \
-            load_LPS_contour_points(os.path.join(input_folder, f'vs_gk_{case_number}' + '_t1', 'contours.json'))
-        structure_contour_list_T2 = \
-            load_LPS_contour_points(os.path.join(input_folder, f'vs_gk_{case_number}' + '_t2', 'contours.json'))
+        structure_contour_list_T1 = load_LPS_contour_points(
+            os.path.join(input_folder, f"vs_gk_{case_number}" + "_t1", "contours.json")
+        )
+        structure_contour_list_T2 = load_LPS_contour_points(
+            os.path.join(input_folder, f"vs_gk_{case_number}" + "_t2", "contours.json")
+        )
 
         # create segments for all structures
         create_segments_from_structure_contour_list(segmentationNode_T1, structure_contour_list_T1)
@@ -456,35 +485,47 @@ def main(argv):
         ## export all files
 
         if register_T1_image_and_contour_points_to_T2_image:
-            lm_node_in_T2_list = save_labelmaps_from_planar_contour(segmentationNode_T2,
-                                                                    ref2, export_only_tumour_seg, case_number, output_folder)  # save contour points registered to T2 image
+            lm_node_in_T2_list = save_labelmaps_from_planar_contour(
+                segmentationNode_T2, ref2, export_only_tumour_seg, case_number, output_folder
+            )  # save contour points registered to T2 image
         if register_T2_image_and_contour_points_to_T1_image:
-            lm_node_in_T1_list = save_labelmaps_from_planar_contour(segmentationNode_T1,
-                                                                    ref1, export_only_tumour_seg, case_number, output_folder)
+            lm_node_in_T1_list = save_labelmaps_from_planar_contour(
+                segmentationNode_T1, ref1, export_only_tumour_seg, case_number, output_folder
+            )
 
         if not register_T1_image_and_contour_points_to_T2_image and not register_T2_image_and_contour_points_to_T1_image:
-            lm_node_in_T2_list = save_labelmaps_from_planar_contour(segmentationNode_T2,
-                                                                    ref2, export_only_tumour_seg, case_number, output_folder)  # save contour points registered to T2 image
-            lm_node_in_T1_list = save_labelmaps_from_planar_contour(segmentationNode_T1, ref1,
-                                                                    export_only_tumour_seg, case_number, output_folder)
+            lm_node_in_T2_list = save_labelmaps_from_planar_contour(
+                segmentationNode_T2, ref2, export_only_tumour_seg, case_number, output_folder
+            )  # save contour points registered to T2 image
+            lm_node_in_T1_list = save_labelmaps_from_planar_contour(
+                segmentationNode_T1, ref1, export_only_tumour_seg, case_number, output_folder
+            )
 
         # save images as nifti files
         if register_T1_image_and_contour_points_to_T2_image:
-            slicer.util.saveNode(ref1, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t1_refT2.nii.gz'))  # pass vol node and destination filename
-            slicer.util.saveNode(ref2, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t2_refT2.nii.gz'))  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref1, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t1_refT2.nii.gz")
+            )  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref2, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t2_refT2.nii.gz")
+            )  # pass vol node and destination filename
         if register_T2_image_and_contour_points_to_T1_image:
-            slicer.util.saveNode(ref1, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t1_refT1.nii.gz'))  # pass vol node and destination filename
-            slicer.util.saveNode(ref2, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t2_refT1.nii.gz'))  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref1, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t1_refT1.nii.gz")
+            )  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref2, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t2_refT1.nii.gz")
+            )  # pass vol node and destination filename
 
         if not register_T1_image_and_contour_points_to_T2_image and not register_T2_image_and_contour_points_to_T1_image:
-            slicer.util.saveNode(ref1, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t1_refT1.nii.gz'))  # pass vol node and destination filename
-            slicer.util.saveNode(ref2, os.path.join(output_folder, f'vs_gk_{case_number}',
-                                                    f'vs_gk_t2_refT2.nii.gz'))  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref1, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t1_refT1.nii.gz")
+            )  # pass vol node and destination filename
+            slicer.util.saveNode(
+                ref2, os.path.join(output_folder, f"vs_gk_{case_number}", f"vs_gk_t2_refT2.nii.gz")
+            )  # pass vol node and destination filename
     sys.exit(0)
+
+
 if __name__ == "__main__":
     main(sys.argv[1:])

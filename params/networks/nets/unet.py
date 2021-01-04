@@ -51,7 +51,14 @@ class UNet(nn.Module):
         self.norm = norm
         self.dropout = dropout
 
-        def _create_block(inc: int, outc: int, channels: Sequence[int], strides: Sequence[int], kernel_sizes: Sequence[int], is_top: bool):
+        def _create_block(
+            inc: int,
+            outc: int,
+            channels: Sequence[int],
+            strides: Sequence[int],
+            kernel_sizes: Sequence[int],
+            is_top: bool,
+        ):
             """
             Builds the UNet structure from the bottom up by recursing down to the bottom block, then creating sequential
             blocks containing the downsample path, a skip connection around the previous block, and the upsample path.
@@ -61,7 +68,9 @@ class UNet(nn.Module):
             k = kernel_sizes[0]
 
             if len(channels) > 2:
-                subblock = _create_block(c, c, channels[1:], strides[1:], kernel_sizes[1:], False)  # continue recursion down
+                subblock = _create_block(
+                    c, c, channels[1:], strides[1:], kernel_sizes[1:], False
+                )  # continue recursion down
                 upc = c * 2
             else:
                 # the next layer is the bottom so stop recursion, create the bottom layer as the sublock for this layer

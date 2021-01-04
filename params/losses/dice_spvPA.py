@@ -38,16 +38,16 @@ class DiceLoss(_Loss):
     """
 
     def __init__(
-            self,
-            include_background: bool = True,
-            to_onehot_y: bool = False,
-            sigmoid: bool = False,
-            softmax: bool = False,
-            other_act: Optional[Callable] = None,
-            squared_pred: bool = False,
-            jaccard: bool = False,
-            hardness_weight=None,
-            reduction: Union[LossReduction, str] = LossReduction.MEAN,
+        self,
+        include_background: bool = True,
+        to_onehot_y: bool = False,
+        sigmoid: bool = False,
+        softmax: bool = False,
+        other_act: Optional[Callable] = None,
+        squared_pred: bool = False,
+        jaccard: bool = False,
+        hardness_weight=None,
+        reduction: Union[LossReduction, str] = LossReduction.MEAN,
     ) -> None:
         """
         Args:
@@ -126,7 +126,7 @@ class DiceLoss(_Loss):
                 input = input[:, 1:]
 
         assert (
-                target.shape == input.shape
+            target.shape == input.shape
         ), f"ground truth has differing shape ({target.shape}) from input ({input.shape})"
 
         # reducing only spatial dimensions (not batch nor channels)
@@ -184,17 +184,17 @@ class Dice_spvPA(_Loss):
     """
 
     def __init__(
-            self,
-            include_background: bool = True,
-            to_onehot_y: bool = False,
-            sigmoid: bool = False,
-            softmax: bool = False,
-            other_act: Optional[Callable] = None,
-            squared_pred: bool = False,
-            jaccard: bool = False,
-            reduction: Union[LossReduction, str] = LossReduction.MEAN,
-            supervised_attention = True,
-            hardness_weighting = True,
+        self,
+        include_background: bool = True,
+        to_onehot_y: bool = False,
+        sigmoid: bool = False,
+        softmax: bool = False,
+        other_act: Optional[Callable] = None,
+        squared_pred: bool = False,
+        jaccard: bool = False,
+        reduction: Union[LossReduction, str] = LossReduction.MEAN,
+        supervised_attention=True,
+        hardness_weighting=True,
     ) -> None:
         """
         Args:
@@ -270,17 +270,17 @@ class Dice_spvPA(_Loss):
                     shape_next_att_map = att_maps[L - level - 2].shape
 
                     # assert that shape of current attention map is multiple of next att map in all dimensions
-                    assert (all([x % y == 0 for x, y in zip(shape_curr_att_map, shape_next_att_map)]))
+                    assert all([x % y == 0 for x, y in zip(shape_curr_att_map, shape_next_att_map)])
                     shape_ratio = [x // y for x, y in zip(shape_curr_att_map, shape_next_att_map)]
 
                     kernel_size_and_stride = shape_ratio[2:5]
-                    G_l = torch.nn.MaxPool3d(kernel_size=kernel_size_and_stride,
-                                             stride=kernel_size_and_stride)(G_l)
+                    G_l = torch.nn.MaxPool3d(kernel_size=kernel_size_and_stride, stride=kernel_size_and_stride)(G_l)
         hardness_weight = None
         if self.hardness_weighting:
             hardness_lambda = 0.6
-            hardness_weight = hardness_lambda * abs(torch.softmax(x, dim=1) - one_hot(target, num_classes=x.shape[1])) \
-                              + (1.0 - hardness_lambda)
+            hardness_weight = hardness_lambda * abs(
+                torch.softmax(x, dim=1) - one_hot(target, num_classes=x.shape[1])
+            ) + (1.0 - hardness_lambda)
             # img = hardness_weight.cpu().detach().numpy()
             # x_ = torch.softmax(x, dim=1).cpu().detach().numpy()
             # target_ = one_hot(target, num_classes=x.shape[1]).cpu().detach().numpy()
@@ -303,7 +303,7 @@ class MaskedDiceLoss(DiceLoss):
     """
 
     def forward(
-            self, input: torch.Tensor, target: torch.Tensor, smooth: float = 1e-5, mask: Optional[torch.Tensor] = None
+        self, input: torch.Tensor, target: torch.Tensor, smooth: float = 1e-5, mask: Optional[torch.Tensor] = None
     ):
         """
         Args:
@@ -316,13 +316,13 @@ class MaskedDiceLoss(DiceLoss):
             # checking if mask is of proper shape
             assert input.dim() == mask.dim(), f"dim of input ({input.shape}) is different from mask ({mask.shape})"
             assert (
-                    input.shape[0] == mask.shape[0] or mask.shape[0] == 1
+                input.shape[0] == mask.shape[0] or mask.shape[0] == 1
             ), f" batch size of mask ({mask.shape}) must be 1 or equal to input ({input.shape})"
 
             if target.dim() > 1:
                 assert mask.shape[1] == 1, f"mask ({mask.shape}) must have only 1 channel"
                 assert (
-                        input.shape[2:] == mask.shape[2:]
+                    input.shape[2:] == mask.shape[2:]
                 ), f"spatial size of input ({input.shape}) is different from mask ({mask.shape})"
 
             input = input * mask
@@ -343,14 +343,14 @@ class GeneralizedDiceLoss(_Loss):
     """
 
     def __init__(
-            self,
-            include_background: bool = True,
-            to_onehot_y: bool = False,
-            sigmoid: bool = False,
-            softmax: bool = False,
-            other_act: Optional[Callable] = None,
-            w_type: Union[Weight, str] = Weight.SQUARE,
-            reduction: Union[LossReduction, str] = LossReduction.MEAN,
+        self,
+        include_background: bool = True,
+        to_onehot_y: bool = False,
+        sigmoid: bool = False,
+        softmax: bool = False,
+        other_act: Optional[Callable] = None,
+        w_type: Union[Weight, str] = Weight.SQUARE,
+        reduction: Union[LossReduction, str] = LossReduction.MEAN,
     ) -> None:
         """
         Args:
@@ -433,7 +433,7 @@ class GeneralizedDiceLoss(_Loss):
                 input = input[:, 1:]
 
         assert (
-                target.shape == input.shape
+            target.shape == input.shape
         ), f"ground truth has differing shape ({target.shape}) from input ({input.shape})"
 
         # reducing only spatial dimensions (not batch nor channels)
@@ -584,7 +584,7 @@ class GeneralizedWassersteinDiceLoss(_Loss):
         return wasserstein_map
 
     def compute_generalized_true_positive(
-            self, alpha: torch.Tensor, flat_target: torch.Tensor, wasserstein_distance_map
+        self, alpha: torch.Tensor, flat_target: torch.Tensor, wasserstein_distance_map
     ):
         """
         Args:
@@ -599,7 +599,10 @@ class GeneralizedWassersteinDiceLoss(_Loss):
         alpha_extended = torch.gather(alpha_extended, index=flat_target_extended, dim=1)
 
         # Compute the generalized true positive as in eq. 9
-        generalized_true_pos = torch.sum(alpha_extended * (1.0 - wasserstein_distance_map), dim=[1, 2], )
+        generalized_true_pos = torch.sum(
+            alpha_extended * (1.0 - wasserstein_distance_map),
+            dim=[1, 2],
+        )
         return generalized_true_pos
 
     def compute_denominator(self, alpha: torch.Tensor, flat_target: torch.Tensor, wasserstein_distance_map):
@@ -616,7 +619,10 @@ class GeneralizedWassersteinDiceLoss(_Loss):
         alpha_extended = torch.gather(alpha_extended, index=flat_target_extended, dim=1)
 
         # Compute the generalized true positive as in eq. 9
-        generalized_true_pos = torch.sum(alpha_extended * (2.0 - wasserstein_distance_map), dim=[1, 2], )
+        generalized_true_pos = torch.sum(
+            alpha_extended * (2.0 - wasserstein_distance_map),
+            dim=[1, 2],
+        )
         return generalized_true_pos
 
     def compute_weights_generalized_true_positives(self, flat_target: torch.Tensor):

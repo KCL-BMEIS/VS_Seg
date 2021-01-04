@@ -9,13 +9,13 @@ from params.VSparams import VSparams
 monai.config.print_config()
 
 # read parsed arguments
-parser = argparse.ArgumentParser(description='Train the model')
+parser = argparse.ArgumentParser(description="Train the model")
 
 # initialize parameters
 p = VSparams(parser)
 
 # set up logger
-logger = p.set_up_logger('test_log.txt')
+logger = p.set_up_logger("test_log.txt")
 
 # log parameters
 p.log_parameters()

@@ -1,10 +1,13 @@
 # Automatic Vestibular Schwannoma Segmentation using Deep Learning
 
 This repository provides scripts for the segmentation of vestibular schwannoma on 3D T1 or T2 images, 
-based on the following paper:
+based on the following papers:
 
 * Wang, G. et al. Automatic Segmentation of Vestibular Schwannoma from T2-Weighted MRI by Deep 
 Spatial Attention with Hardness-Weighted Loss, MICCAI, pp 264-272, 2019.
+* Shapey, J. et al. An artificial intelligence framework for automatic segmentation and volumetry of vestibular 
+  schwannomas from contrast-enhanced T1-weighted and high-resolution T2-weighted MRI. Journal of Neurosurgery, 
+  1(aop), pp.1-9.   
 
 
 ## Model
@@ -21,7 +24,7 @@ maxpooling.
 - each convolution (except from the convolutions of the attention module) has a dropout layer
 following the PRelu activation
 
-<img src="model_sketch.png" width="880" height="1000">
+<img src="figures/model_sketch.png" width="880" height="1000">
 
 ##  Requirements
 
@@ -37,9 +40,9 @@ The following setup has been tested on Ubuntu 20.04.
 
         pip install torch
     
-* [MONAI](https://monai.io/) The code has been tested with github commit 0d197e which can be installed with:
+* [MONAI](https://monai.io/) The code has been tested with github commit 0b415f which can be installed with:
 
-        pip install git+https://github.com/Project-MONAI/MONAI.git@0d197e6bea9dd2244c63b80a80b464ef23a5aab9
+        pip install git+https://github.com/Project-MONAI/MONAI.git@0b415f09db82a39f1df5bafd9b8ff67f9f3f677c
 
 * natsort (recommended: 7.0.1)
 
@@ -52,11 +55,16 @@ The following setup has been tested on Ubuntu 20.04.
 * nibabel (recommended: 3.3.1)
 
         pip install nibabel
+
+* torchvision (recommended: 0.7.0)
+        
+        pip install torchvision
         
 ## How to store/access the data
 After downloading the repository VS_Seg, create a folder VS_Seg/data and place your data in it, 
-e.g. the folder VS_T2_crop which contains image files (vs_gk_<case_number>_t2.nii.gz) and corresponding 
-label files (vs_gk_<case_number>_t2_seg.nii.gz)
+e.g. the folder VS_defaced which contains the data as shown in the figure below.
+
+<img src="figures/model_sketch.png" width="150" height="200">
 
 In case, the folder structure or file names are different from the suggested one, or to exclude cases follow
 these instructions:
@@ -70,7 +78,17 @@ images/labels, `val_files`to the validation images/labels and `test_files` to th
 # How to train
 To start training, run the following command from a terminal in the VS_Seg repository:
 
-        python3 VS_train.py --results_folder_name $RESUlTS_FOLDER_NAME 2> train_error_log.txt
+        python3 VS_train.py --results_folder_name $RESULTS_FOLDER_NAME 2> train_error_log.txt
+
+optional parameters:
+
+`--no_attention` removes attention module from neural network and attention maps from loss function
+
+`--no_hardness` removes voxel hardness weighting from loss function
+
+`--dataset T1` or `--dataset T2` to select the T1 or T2 dataset (default: T1)
+
+`--debug` to run the algorithm on a small dataset, for only a couple of epochs
 
 This script will create the folder VS_crop/model/results/<RESULTS_FOLDER_NAME> and the three sub-folders
 
@@ -95,21 +113,18 @@ VS_Seg/Params/VSparams.py
 # How to test
 To start the training run the following command from a terminal in the VS_Seg repository:
 
-        python3 VS_inference.py --results_folder_name $RESUlTS_FOLDER_NAME 2> inference_error_log.txt
+        python3 VS_inference.py --results_folder_name $RESULTS_FOLDER_NAME 2> inference_error_log.txt
 
-optional parameters:
 
-`--no_attention` removes attention module from neural network and attention maps from loss function
-
-`--no_hardness` removes voxel hardness weighting from loss function
-
-`--dataset T1` or `--dataset T2` to select the T1 or T2 dataset (default: T1)
-
-<RESUlTS_FOLDER_NAME> has to match the name chosen in the training command.
-The script will create in the folders:
-* figures &#10230; one png file per image in the test set showing the centre of mass slice (based 
+<RESULTS_FOLDER_NAME> and all other optional parameters have to match the values chosen in the training command.
+The script will create the following sub-folders:
+* figures &#10230; contains one png file per image in the test set showing the centre of mass slice (based 
 on ground truth label) with ground truth label and predicted label
 * logs &#10230; test_log.txt contains individual and mean dice scores of test set
 
 Additionally, all output and error messages are logged in VS_Seg/inference_error_log.txt
 
+# Using Tensorboard to monitor training progress
+The training algorithm will create a folder `runs` in the root folder and store the training progress data in it.
+If tensorboard is installed the following command can be used to monitor the training progress:
+`tensorboard --logdir ./runs`

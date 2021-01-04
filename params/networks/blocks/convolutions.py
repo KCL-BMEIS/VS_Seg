@@ -114,8 +114,9 @@ class Convolution(nn.Sequential):
         if is_transposed:
             # calculate output_padding such that the output shape of the transpose convolution is equal to the input
             # shape times the number of strides in all dimensions
-            output_padding = np.array(strides) + 2 * np.array(padding) - np.array(dilation) * (
-                        np.array(kernel_size) - 1) - 1
+            output_padding = (
+                np.array(strides) + 2 * np.array(padding) - np.array(dilation) * (np.array(kernel_size) - 1) - 1
+            )
             if output_padding.size == 1:
                 output_padding = output_padding.astype(int)
             else:

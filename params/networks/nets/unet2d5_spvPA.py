@@ -18,23 +18,24 @@ from monai.networks.layers.simplelayers import SkipConnection
 from monai.utils import export
 from monai.utils.aliases import alias
 
+
 @export("monai.networks.nets")
 @alias("Unet2d5_spvPA")
 class UNet2d5_spvPA(nn.Module):
     def __init__(
-            self,
-            dimensions,
-            in_channels,
-            out_channels,
-            channels,
-            strides,
-            kernel_sizes,
-            sample_kernel_sizes,
-            num_res_units=0,
-            act=Act.PRELU,
-            norm=Norm.INSTANCE,
-            dropout=0,
-            attention_module=True,
+        self,
+        dimensions,
+        in_channels,
+        out_channels,
+        channels,
+        strides,
+        kernel_sizes,
+        sample_kernel_sizes,
+        num_res_units=0,
+        act=Act.PRELU,
+        norm=Norm.INSTANCE,
+        dropout=0,
+        attention_module=True,
     ):
         super().__init__()
         assert len(channels) == len(kernel_sizes) == (len(strides)) + 1 == len(sample_kernel_sizes) + 1
@@ -68,14 +69,16 @@ class UNet2d5_spvPA(nn.Module):
 
             if len(channels) > 2:
                 # continue recursion down
-                subblock = _create_block(c, channels[1], channels[1:], strides[1:], kernel_sizes[1:],
-                                         sample_kernel_sizes[1:], is_top=False)
+                subblock = _create_block(
+                    c, channels[1], channels[1:], strides[1:], kernel_sizes[1:], sample_kernel_sizes[1:], is_top=False
+                )
             else:
                 # the next layer is the bottom so stop recursion, create the bottom layer as the sublock for this layer
-                subblock = self._get_bottom_layer(in_channels=c,
-                                                  out_channels=channels[1],
-                                                  kernel_size=kernel_sizes[1],
-                                                  )
+                subblock = self._get_bottom_layer(
+                    in_channels=c,
+                    out_channels=channels[1],
+                    kernel_size=kernel_sizes[1],
+                )
 
             upsample = self._get_upsample_layer(in_channels=channels[1], out_channels=c, strides=s, up_kernel_size=sk)
             subblock_with_resampling = nn.Sequential(downsample, subblock, upsample)
@@ -85,8 +88,9 @@ class UNet2d5_spvPA(nn.Module):
 
             return nn.Sequential(down, SkipConnection(subblock_with_resampling), up)
 
-        self.model = _create_block(in_channels, out_channels, self.channels, self.strides, self.kernel_sizes,
-                                   self.sample_kernel_sizes, True)
+        self.model = _create_block(
+            in_channels, out_channels, self.channels, self.strides, self.kernel_sizes, self.sample_kernel_sizes, True
+        )
 
         # register forward hooks on all Attentionblock1 modules, to save the attention maps
         if self.attention_module:
@@ -100,23 +104,9 @@ class UNet2d5_spvPA(nn.Module):
         self.att_maps.append(outp[0])  # get first element of output (Attentionblock1 returns (att, x) )
 
     def _get_att_layer(self, in_channels, out_channels, kernel_size):
-        att1 = AttentionBlock1(
-            self.dimensions,
-            in_channels,
-            out_channels,
-            kernel_size,
-            norm=None,
-            dropout=self.dropout
-            )
+        att1 = AttentionBlock1(self.dimensions, in_channels, out_channels, kernel_size, norm=None, dropout=self.dropout)
 
-        att2 = AttentionBlock2(
-            self.dimensions,
-            in_channels,
-            out_channels,
-            kernel_size,
-            norm=None,
-            dropout=self.dropout
-            )
+        att2 = AttentionBlock2(self.dimensions, in_channels, out_channels, kernel_size, norm=None, dropout=self.dropout)
 
         return nn.Sequential(att1, att2)
 

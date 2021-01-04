@@ -9,7 +9,7 @@ from params.VSparams import VSparams
 monai.config.print_config()
 
 # read parsed arguments
-parser = argparse.ArgumentParser(description='Train the model')
+parser = argparse.ArgumentParser(description="Train the model")
 
 # initialize parameters
 p = VSparams(parser)
@@ -18,7 +18,7 @@ p = VSparams(parser)
 p.create_results_folders()
 
 # set up logger
-logger = p.set_up_logger('training_log.txt')
+logger = p.set_up_logger("training_log.txt")
 
 # log parameters
 p.log_parameters()
@@ -45,8 +45,7 @@ loss_function = p.set_and_get_loss_function()
 optimizer = p.set_and_get_optimizer(model)
 
 # run training algorithm
-epoch_loss_values, metric_values = \
-    p.run_training_algorithm(model, loss_function, optimizer, train_loader, val_loader)
+epoch_loss_values, metric_values = p.run_training_algorithm(model, loss_function, optimizer, train_loader, val_loader)
 
 # plot loss and mean dice
 p.plot_loss_curve_and_mean_dice(epoch_loss_values, metric_values)
