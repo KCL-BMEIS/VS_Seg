@@ -40,9 +40,9 @@ The following setup has been tested on Ubuntu 20.04.
 
         pip install torch
     
-* [MONAI](https://monai.io/) The code has been tested with github commit 0b415f which can be installed with:
-
-        pip install git+https://github.com/Project-MONAI/MONAI.git@0b415f09db82a39f1df5bafd9b8ff67f9f3f677c
+* [MONAI](https://monai.io/) (recommended: 0.4.0) 
+  
+        pip install monai
 
 * natsort (recommended: 7.0.1)
 
