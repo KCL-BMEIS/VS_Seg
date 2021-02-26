@@ -4,6 +4,7 @@ import numpy as np
 from natsort import natsorted
 from time import perf_counter
 import glob
+import csv
 from time import strftime
 import torch
 from torch.utils.data import DataLoader
@@ -23,7 +24,7 @@ from monai.transforms import (
     ToTensord,
 )
 from monai.networks.layers import Norm
-
+from monai.data import NiftiSaver
 # from torchviz import make_dot
 # import hiddenlayer as hl
 from .networks.nets.unet2d5_spvPA import UNet2d5_spvPA
@@ -38,7 +39,10 @@ class VSparams:
         parser.add_argument("--debug", dest="debug", action="store_true", help="activate debugging mode")
         parser.set_defaults(debug=False)
 
-        parser.add_argument("--dataset", type=str, default="T2", help='(string) use "T1" or "T2" to select dataset')
+        parser.add_argument("--split", type=str, default="./params/split_TCIA.csv", help="path to CSV file that defines"
+                                                                                         " training, validation and"
+                                                                                         " test datasets")
+        parser.add_argument("--dataset", type=str, default="T1", help='(string) use "T1" or "T2" to select dataset')
         parser.add_argument("--train_batch_size", type=int, default=1, help="batch size of the forward pass")
         parser.add_argument("--initial_learning_rate", type=float, default=1e-4, help="learning rate at first epoch")
         parser.add_argument(
@@ -66,14 +70,9 @@ class VSparams:
         self.debug = args.debug
         self.dataset = args.dataset
         self.data_root = "./data/VS_defaced/"  # set path to data set
-        self.num_train, self.num_val, self.num_test = (
-            176,
-            20,
-            46,
-        )  # number of images in training, validation and test set AFTER discarding
+        self.split_csv = args.split
         if self.debug:
-            self.num_train, self.num_val, self.num_test = 2, 2, 2
-        self.discard_cases_idx = []
+            self.split_csv = "./params/split_debug.csv"
         self.pad_crop_shape = [384, 384, 64]
         if self.debug:
             self.pad_crop_shape = [128, 128, 32]
@@ -99,6 +98,7 @@ class VSparams:
             self.sliding_window_inferer_roi_size = [128, 128, 32]
         self.attention = args.attention
         self.hardness = args.hardness
+        self.export_inferred_segmentations = True
 
         # paths
         self.results_folder_path = os.path.join(self.data_root, "results", args.results_folder_name)
@@ -144,8 +144,7 @@ class VSparams:
         logger.info("Parameters: ")
         logger.info("dataset =                          {}".format(self.dataset))
         logger.info("data_root =                        {}".format(self.data_root))
-        logger.info("num_train, num_val, num_test =     {}, {}, {}".format(self.num_train, self.num_val, self.num_test))
-        logger.info("discard_cases_idx =                {}".format(self.discard_cases_idx))
+        logger.info("split_csv =                        {}".format(self.split_csv))
         logger.info("pad_crop_shape =                   {}".format(self.pad_crop_shape))
         logger.info("pad_crop_shape_test =              {}".format(self.pad_crop_shape_test))
         logger.info("num_workers =                      {}".format(self.num_workers))
@@ -164,56 +163,34 @@ class VSparams:
         logger.info("hardness =                         {}".format(self.hardness))
 
         logger.info("results_folder_path =              {}".format(self.results_folder_path))
+        logger.info("export_inferred_segmentations =    {}".format(self.export_inferred_segmentations))
         logger.info("-" * 10)
 
     def load_T1_or_T2_data(self):
         logger = self.logger
-        # find and sort all files under the following paths
-        if self.dataset == "T1":
-            logger.info("Load T1 data set")
-            all_images = natsorted(
-                glob.glob(os.path.join(self.data_root, "input_data", "vs_gk_*", "vs_gk_t1_refT1.nii.gz"))
-            )
-            all_labels = natsorted(
-                glob.glob(os.path.join(self.data_root, "input_data", "vs_gk_*", "vs_gk_seg_refT1.nii.gz"))
-            )
-        elif self.dataset == "T2":
-            logger.info("Load T2 data set")
-            all_images = natsorted(
-                glob.glob(os.path.join(self.data_root, "input_data", "vs_gk_*", "vs_gk_t2_refT2.nii.gz"))
-            )
-            all_labels = natsorted(
-                glob.glob(os.path.join(self.data_root, "input_data", "vs_gk_*", "vs_gk_seg_refT2.nii.gz"))
-            )
-        else:
-            raise Exception("The dataset '" + self.dataset + "' is not defined.")
 
-        assert len(all_images) == len(all_labels), "Not the same number of images and labels"
-        assert len(all_images) >= sum((self.num_train, self.num_val, self.num_test, len(self.discard_cases_idx))), (
-            f"Sum of desired training ({self.num_train}), validation ({self.num_val}), test ({self.num_test}) "
-            f"and discarded ({len(self.discard_cases_idx)}) set size is larger than total number of images in data set "
-            f"({len(all_images)})."
-        )
+        train_files, val_files, test_files = [], [], []
 
-        # discard cases
-        for i in self.discard_cases_idx:
-            elimination_str = "gk_" + str(i) + "_"
-            for im_idx, path in enumerate(all_images):
-                if elimination_str in path:
-                    all_images.pop(im_idx)
-                    all_labels.pop(im_idx)
+        with open(self.split_csv) as csvfile:
+            csvReader = csv.reader(csvfile)
+            for row in csvReader:
+                if self.dataset == "T1":
+                    image_name = os.path.join(self.data_root, 'input_data', row[0], 'vs_gk_t1_refT1.nii.gz')
+                    label_name = os.path.join(self.data_root, 'input_data', row[0], 'vs_gk_seg_refT1.nii.gz')
+                elif self.dataset == "T2":
+                    image_name = os.path.join(self.data_root, 'input_data', row[0], 'vs_gk_t2_refT2.nii.gz')
+                    label_name = os.path.join(self.data_root, 'input_data', row[0], 'vs_gk_seg_refT2.nii.gz')
+                if row[1] == "training":
+                    train_files.append({"image": image_name, "label": label_name})
+                elif row[1] == "validation":
+                    val_files.append({"image": image_name, "label": label_name})
+                elif row[1] == "test":
+                    test_files.append({"image": image_name, "label": label_name})
 
-        # create a list of dictionaries, each of which contains an image and a label
-        data_dicts = [
-            {"image": image_name, "label": label_name} for image_name, label_name in zip(all_images, all_labels)
-        ]
-
-        # split up the dictionaries into training, validation and test set
-        train_files, val_files, test_files = (
-            data_dicts[: self.num_train],
-            data_dicts[self.num_train : self.num_train + self.num_val],
-            data_dicts[self.num_train + self.num_val : self.num_train + self.num_val + self.num_test],
-        )
+        # check if all files exist
+        for file_dict in train_files + val_files + test_files:
+            assert (os.path.isfile(file_dict['image'])), f" {file_dict['image']} is not a file"
+            assert (os.path.isfile(file_dict['label'])), f" {file_dict['label']} is not a file"
 
         logger.info("Number of images in training set   = {}".format(len(train_files)))
         logger.info("Number of images in validation set = {}".format(len(val_files)))
@@ -249,6 +226,10 @@ class VSparams:
                 AddChanneld(keys=["image", "label"]),
                 Orientationd(keys=["image", "label"], axcodes="RAS"),
                 NormalizeIntensityd(keys=["image"]),
+                SpatialPadd(keys=["image", "label"], spatial_size=self.pad_crop_shape),
+                RandSpatialCropd(
+                    keys=["image", "label"], roi_size=self.pad_crop_shape, random_center=True, random_size=False,
+                ),
                 ToTensord(keys=["image", "label"]),
             ]
         )
@@ -482,7 +463,7 @@ class VSparams:
                 epoch_loss += loss.item()
                 if epoch == 0:
                     logger.info(
-                        "{}/{}, train_loss: {:.4f}".format(step, self.num_train // train_loader.batch_size, loss.item())
+                        "{}/{}, train_loss: {:.4f}".format(step, len(train_loader) // train_loader.batch_size, loss.item())
                     )
             epoch_loss /= step  # calculate mean loss over current epoch
             epoch_loss_values.append(epoch_loss)
@@ -500,23 +481,15 @@ class VSparams:
                         step += 1
                         val_inputs, val_labels = val_data["image"].to(self.device), val_data["label"].to(self.device)
 
-                        # value1 = compute_meandice(y_pred=val_outputs, y=val_labels, include_background=False,
-                        #                           to_onehot_y=True, mutually_exclusive=True)
+                        val_outputs = model(val_inputs)
 
-                        if self.model == "UNet2d5_spvPA":
-                            model_segmentation = lambda *args, **kwargs: model(*args, **kwargs)[0]
-                        else:
-                            model_segmentation = model
+                        dice_score = self.compute_dice_score(val_outputs[0], val_labels)
 
-                        val_outputs = sliding_window_inference(
-                            inputs=val_inputs,
-                            roi_size=self.sliding_window_inferer_roi_size,
-                            sw_batch_size=1,
-                            predictor=model_segmentation,
-                            mode="gaussian",
-                        )
+                        loss = loss_function(val_outputs, val_labels)
 
-                        dice_score = self.compute_dice_score(val_outputs, val_labels)
+                        metric_count += len(dice_score)
+                        metric_sum += dice_score.sum().item()
+                        epoch_loss_val += loss.item()
 
                         metric_count += len(dice_score)
                         metric_sum += dice_score.sum().item()
@@ -578,7 +551,9 @@ class VSparams:
 
     def run_inference(self, model, data_loader):
         logger = self.logger
-        logger.info("Running inference...")
+        logger.info('Running inference...')
+
+        saver = NiftiSaver(output_dir=os.path.join(self.results_folder_path, 'inferred_segmentations_nifti'))
 
         model.eval()  # activate evaluation mode of model
         dice_scores = np.zeros(len(data_loader))
@@ -604,6 +579,12 @@ class VSparams:
                 dice_scores[i] = dice_score.item()
 
                 logger.info(f"dice_score = {dice_score.item()}")
+
+                # export to nifti
+                if self.export_inferred_segmentations:
+                    logger.info(f"export to nifti...")
+
+                    saver.save_batch(torch.argmax(outputs, dim=1, keepdim=True), meta_data=data['label_meta_dict'])
 
                 # plot centre of mass slice of label
                 label = torch.squeeze(data["label"][0, 0, :, :, :])
