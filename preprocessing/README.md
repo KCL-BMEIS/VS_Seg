@@ -1,6 +1,6 @@
 # Data preprocessing
-Data preprocessing typically includes converting DICOM images and DICOM RTstructures to NIFTI files.
-
+This readme explains how to convert the TCIA data set into a data set with a more convenient folder structure and file 
+names and how to subsequently convert the DICOM images and JSON contour lines into NIFTI format.
 
 ##  Requirements
 
@@ -8,23 +8,34 @@ The following setup has been tested on Ubuntu 20.04.
 
 * 3D Slicer 4.13 or later (https://download.slicer.org/). 
 * SlicerRT (http://slicerrt.github.io/Download.html)
-* Download the raw data. (Dicom images and contours.json)
+* Download the raw data from https://doi.org/10.7937/TCIA.9YTJ-5Q73. (Dicom images and contours.json)
 
-        
+## Create data set with convenient folder structure:
+Run the following command to convert the TCIA data set in "Descriptive Directory Name" format into a new folder
+folders are called `vs_gk_<subject_number>_<modality>`:
+
+```python3 TCIA_data_convert_into_convenient_folder_structure.py  --input <input_folder> --output <output_folder>```
+
+The script has the following dependencies:
+
+* pydicom (`pip install pydicom`)
+* natsort (`pip install natsort`)
+
 ## DICOM Images + contours.json conversion to NIFTI files
 
 To preprocess the data, run the following command in the VS_Seg repository:
 
-``` <SLICER_DIR>/Slicer --python-script preprocessing/data_conversion.py --input-folder <DATA_FOLDER> --results_folder_name <OUTPUT_DATA_FOLDER> ```
+``` <SLICER_DIR>/Slicer --python-script preprocessing/data_conversion.py --input-folder <INPUT_DATA_FOLDER> --results_folder_name <OUTPUT_DATA_FOLDER> ```
+
 where:
 * The 3DSlicer archive has been unpacked at <SLICER_DIR>.
-* <DATA_FOLDER> denotes the folder that contains all the patient-specific subfolders (i.e. <DATA_FOLDER>/<PATIENT_ID>/*.dcm).
+* <INPUT_DATA_FOLDER> is the path to the TCIA data set after conversion to the convenient folder structure. 
 
 description:
 
---input-folder <DATA_FOLDER>  
-* <DATA_FOLDER> is a path to a folder containing sub-folders named `vs_gk_<case_number>_t1`,
-                                and `vs_gk_<case_number>_t2`, which contain image files in DICOM format and the
+--input-folder <INPUT_DATA_FOLDER>  
+* <INPUT_DATA_FOLDER> is a path to a folder containing sub-folders named `vs_gk_<case_number>_t1`,
+                                and `vs_gk_<case_number>_t2`, which contain image files in DICOM format, and the
                                 contours.json file 
 
 `--register` ... optional keyword:

@@ -8,7 +8,22 @@ Spatial Attention with Hardness-Weighted Loss, MICCAI, pp 264-272, 2019.
 * Shapey, J. et al. An artificial intelligence framework for automatic segmentation and volumetry of vestibular 
   schwannomas from contrast-enhanced T1-weighted and high-resolution T2-weighted MRI. Journal of Neurosurgery, 
   1(aop), pp.1-9.   
+  
 
+## TCIA dataset
+The dataset described in these publications is publicly available on The Cancer Imaging Archive (TCIA):
+
+Shapey, J., Kujawa, A., Dorent, R., Wang, G., Bisdas, S., Dimitriadis, A., Grishchuck, D., Paddick, I., Kitchen, 
+N., Bradford, R., Saeed, S., Ourselin, S., & Vercauteren, T. (2021). Segmentation of Vestibular Schwannoma from 
+Magnetic Resonance Imaging: An Open Annotated Dataset and Baseline Algorithm [Data set]. The Cancer Imaging Archive. 
+https://doi.org/10.7937/TCIA.9YTJ-5Q73 
+
+Note, that one subject (VS-SEG-168) had to be removed from the data set because the data was incomplete. 
+
+TCIA offers to download the data set under a "Desciptive Folder Name" or a "Classic Folder Name". We recommend
+choosing the Descriptive Folder Name and using the instruction under `prepocessing` to convert the
+data set into a new data set with a more convenient folder structure and file names and to convert DICOM images and 
+segmentations into NIFTI files that are required as input to the automatic segmentation algorithm. 
 
 ## Model
 
@@ -35,6 +50,10 @@ The following setup has been tested on Ubuntu 20.04.
 * [cuDNN](https://developer.nvidia.com/cudnn). Suggested version 7.6.5 or above.
 
 * Python. Suggested version is 3.6.
+
+The following Python libraries can be installed individually, or with a single command:
+
+        pip install -r requirements.txt
 
 * [PyTorch](https://pytorch.org/get-started/locally/) (recommended 1.6.0)
 
@@ -86,6 +105,10 @@ To start training, run the following command from a terminal in the VS_Seg repos
 
 optional parameters:
 
+`--results_folder_name` followed by path to folder in which results are to be saved
+
+`--split` followed by path to CSV file. See `params/split_TCIA.csv` as an example.
+
 `--no_attention` removes attention module from neural network and attention maps from loss function
 
 `--no_hardness` removes voxel hardness weighting from loss function
@@ -109,12 +132,14 @@ during training.
 
 * model &#10230; stores the model that performed best on the validation set (best_metric_model.pth)
 
+* inferred_segmentations_nifti &#10230; contains the segmentations from inference (see next section)
+
 Additionally, all output and error messages are logged in VS_Seg/train_error_log.txt
 
 All model and optimizer parameters can be changed in the `__init__` function of class VSparams in
 VS_Seg/Params/VSparams.py
 
-# How to test
+# How to run inference
 To start the training run the following command from a terminal in the VS_Seg repository:
 
         python3 VS_inference.py --results_folder_name $RESULTS_FOLDER_NAME 2> inference_error_log.txt
