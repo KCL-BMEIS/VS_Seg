@@ -11,7 +11,7 @@ Spatial Attention with Hardness-Weighted Loss, MICCAI, pp 264-272, 2019.
   
 
 ## TCIA dataset
-The dataset described in these publications is publicly available on The Cancer Imaging Archive (TCIA):
+The dataset described in these publications is publicly available in The Cancer Imaging Archive (TCIA):
 
 Shapey, J., Kujawa, A., Dorent, R., Wang, G., Bisdas, S., Dimitriadis, A., Grishchuck, D., Paddick, I., Kitchen, 
 N., Bradford, R., Saeed, S., Ourselin, S., & Vercauteren, T. (2021). Segmentation of Vestibular Schwannoma from 
@@ -23,7 +23,10 @@ Note, that one subject (VS-SEG-168) had to be removed from the data set because 
 TCIA offers to download the data set under a "Desciptive Folder Name" or a "Classic Folder Name". We recommend
 choosing the Descriptive Folder Name and using the instruction under `prepocessing` to convert the
 data set into a new data set with a more convenient folder structure and file names and to convert DICOM images and 
-segmentations into NIFTI files that are required as input to the automatic segmentation algorithm. 
+segmentations into NIFTI files that are required as input to the automatic segmentation algorithm.
+
+On TCIA, you can also download affine registration matrices (.tfm files) and the original segmentation contour lines
+(JSON files) under the "Version 2" tab.
 
 ## Model
 

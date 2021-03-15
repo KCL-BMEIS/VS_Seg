@@ -8,35 +8,58 @@ The following setup has been tested on Ubuntu 20.04.
 
 * 3D Slicer 4.13 or later (https://download.slicer.org/). 
 * SlicerRT (http://slicerrt.github.io/Download.html)
-* Download the raw data from https://doi.org/10.7937/TCIA.9YTJ-5Q73. (Dicom images and contours.json)
+  
+
+* Download the following raw data from https://doi.org/10.7937/TCIA.9YTJ-5Q73:
+  * Images and Radiation Therapy Structures (DICOM, 26 GB) in "Descriptive Directory Name" format
+  * Contours (JSON, zip, 16.7 MB)
+  * Registration Matrices (.tfm, zip, 257 KB)
 
 ## Create data set with convenient folder structure:
-Run the following command to convert the TCIA data set in "Descriptive Directory Name" format into a new folder
-folders are called `vs_gk_<subject_number>_<modality>`:
+The folder structure and file names of the "Images and Radiation Therapy Structures" are not intuitive. 
+Therefore, run the following command to convert the TCIA data set in "Descriptive Directory Name" format into a new folder
+structure: 
 
 ```python3 TCIA_data_convert_into_convenient_folder_structure.py  --input <input_folder> --output <output_folder>```
+
+The new folder structure will have sub-folders called `vs_gk_<subject_number>_<modality>`.
 
 The script has the following dependencies:
 
 * pydicom (`pip install pydicom`)
 * natsort (`pip install natsort`)
 
-## DICOM Images + contours.json conversion to NIFTI files
+This folder structure corresponds to the folder structure of the "Contours" and "Registration Matrices" downloaded from 
+TCIA. 
 
-To preprocess the data, run the following command in the VS_Seg repository:
+Next, manually merge the files from "Contours" and "Registration Matrices" into the new folder structure. The merged dataset will look like this:
+
+<img src="figures/TCIA_convenient_folder_structure.png" width="600" height="200">
+
+This folder structure is required as the input for the conversion script, which will produce (registered) NIFTI images and segmentations. 
+
+## Conversion of DICOM images and contours.json files to NIFTI and (optional) registration 
+
+To convert the DICOM images into NIFTI images and the planar contour lines of the tumour segmentation from the 
+contours.json files into binary segmentations in NIFTI format, run the following command in the VS_Seg repository:
 
 ``` <SLICER_DIR>/Slicer --python-script preprocessing/data_conversion.py --input-folder <INPUT_DATA_FOLDER> --results_folder_name <OUTPUT_DATA_FOLDER> ```
 
 where:
 * The 3DSlicer archive has been unpacked at <SLICER_DIR>.
-* <INPUT_DATA_FOLDER> is the path to the TCIA data set after conversion to the convenient folder structure. 
 
 description:
 
---input-folder <INPUT_DATA_FOLDER>  
+`````--input-folder <INPUT_DATA_FOLDER>  `````
 * <INPUT_DATA_FOLDER> is a path to a folder containing sub-folders named `vs_gk_<case_number>_t1`,
                                 and `vs_gk_<case_number>_t2`, which contain image files in DICOM format, and the
-                                contours.json file 
+                                contours.json file and registration matrices in .tfm format. 
+                                This corresponds to the output of the script 
+                                "TCIA_data_convert_into_convenient_folder_structure.py" described in the previous 
+                                section.  
+  
+`````--results_folder_name <OUTPUT_DATA_FOLDER>`````
+* <OUTPUT_DATA_FOLDER> is the path to the folder where the NIFTI files are supposed to be saved
 
 `--register` ... optional keyword:
 * options:

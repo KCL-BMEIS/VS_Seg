@@ -553,8 +553,6 @@ class VSparams:
         logger = self.logger
         logger.info('Running inference...')
 
-        saver = NiftiSaver(output_dir=os.path.join(self.results_folder_path, 'inferred_segmentations_nifti'))
-
         model.eval()  # activate evaluation mode of model
         dice_scores = np.zeros(len(data_loader))
 
@@ -584,7 +582,16 @@ class VSparams:
                 if self.export_inferred_segmentations:
                     logger.info(f"export to nifti...")
 
-                    saver.save_batch(torch.argmax(outputs, dim=1, keepdim=True), meta_data=data['label_meta_dict'])
+                    nifti_data_matrix = np.squeeze(torch.argmax(outputs, dim=1, keepdim=True))[None, :]
+                    data['label_meta_dict']['filename_or_obj'] = data['label_meta_dict']['filename_or_obj'][0]
+                    data['label_meta_dict']['affine'] = np.squeeze(data['label_meta_dict']['affine'])
+                    data['label_meta_dict']['original_affine'] = np.squeeze(data['label_meta_dict']['original_affine'])
+
+                    folder_name = os.path.basename(os.path.dirname(data['label_meta_dict']['filename_or_obj']))
+                    saver = NiftiSaver(
+                        output_dir=os.path.join(self.results_folder_path, 'inferred_segmentations_nifti', folder_name),
+                        output_postfix='')
+                    saver.save(nifti_data_matrix, meta_data=data['label_meta_dict'])
 
                 # plot centre of mass slice of label
                 label = torch.squeeze(data["label"][0, 0, :, :, :])
