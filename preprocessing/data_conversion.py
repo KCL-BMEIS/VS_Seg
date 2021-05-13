@@ -307,7 +307,7 @@ def save_labelmaps_from_planar_contour(
         slicer.modules.segmentations.logic().ExportSegmentsToLabelmapNode(pc_node, segmentID_a, lm_node, ref)
 
         # specialcharacters to remove from output filename (they could come from name of segmented structure)
-        charsRoRemove = ["!", "?", ":", ";", "*", " "]
+        charsRoRemove = ["!", "?", ";", "*", " "]
 
         # create filenames and remove special characters from output filename (they could come from name of segmented structure)
         if export_only_tumour_seg:

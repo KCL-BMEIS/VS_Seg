@@ -43,7 +43,7 @@ This folder structure is required as the input for the conversion script, which 
 To convert the DICOM images into NIFTI images and the planar contour lines of the tumour segmentation from the 
 contours.json files into binary segmentations in NIFTI format, run the following command in the VS_Seg repository:
 
-``` <SLICER_DIR>/Slicer --python-script preprocessing/data_conversion.py --input-folder <INPUT_DATA_FOLDER> --results_folder_name <OUTPUT_DATA_FOLDER> ```
+``` <SLICER_DIR>/Slicer --python-script preprocessing/data_conversion.py --input-folder <INPUT_DATA_FOLDER> --output-folder <OUTPUT_DATA_FOLDER> ```
 
 where:
 * The 3DSlicer archive has been unpacked at <SLICER_DIR>.
@@ -58,7 +58,7 @@ description:
                                 "TCIA_data_convert_into_convenient_folder_structure.py" described in the previous 
                                 section.  
   
-`````--results_folder_name <OUTPUT_DATA_FOLDER>`````
+`````--output-folder <OUTPUT_DATA_FOLDER>`````
 * <OUTPUT_DATA_FOLDER> is the path to the folder where the NIFTI files are supposed to be saved
 
 `--register` ... optional keyword:
