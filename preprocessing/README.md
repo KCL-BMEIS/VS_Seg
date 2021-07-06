@@ -83,3 +83,8 @@ dimensions of the T2 image.
                             vs\_gk\_struc<structure_index>\_<structure_name>\_refT2.nii.gz where <structure_index> refers to
                             the order of the structures in the contours.json file (starting from 1) and <structure_name>
                             is the name of the structure as specified in the contours.json file. If `--register T1` or `--register T2` is used, only one of the two files is exported.
+
+
+# How to create a Brain Imaging Data Structure (BIDS) data set
+We provide a [python script](createBIDSdataset/data_conversion_BIDS.py) that creates a valid BIDS dataset from the source data found on 
+TCIA using 3D Slicer. Instructions can be found in the [README.md](createBIDSdataset/README.md) of the [createBIDSdataset](createBIDSdataset) folder.

@@ -1,0 +1,23 @@
+{
+    "Name": "manual_segmentation_masks_of_T2w",
+    "BIDSVersion": "1.6.0",
+    "DatasetType": "derivative",
+    "GeneratedBy": [
+        {
+            "Name": "Manual",
+            "Description": "Manual segmentation of the Vestibular Schwannoma based on T1w and T2w image."
+        },
+        {
+            "Name": "3DSlicer with python script: https://github.com/KCL-BMEIS/VS_Seg/tree/master/preprocessing/createBIDSdataset/data_conversion_BIDS.py",
+            "Description": "Conversion from contour points in space of the T2w image to nifti."
+        }
+    ],
+    "SourceDatasets": [
+        {
+            "URL": "file://../../../VS_SEG_BIDS"
+        },
+        {
+            "URL": "file://../../../VS_SEG_BIDS/sourcedata/registration_matrices"
+        }
+    ]
+}

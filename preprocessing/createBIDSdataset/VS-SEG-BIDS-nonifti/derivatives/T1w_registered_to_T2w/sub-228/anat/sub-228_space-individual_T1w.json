@@ -1,0 +1,9 @@
+{
+    "Description": "T1w image after after affine transformation to space corresponding T2w image. The affine transformation matrix was obtained from the Gamma Knife treatment planning system, which itself uses the fiducial cage into which the patients head is fixed.",
+    "Sources": "sourcedata/registration_matrices/sub-228/anat/sub-228_inv_T1_LPS_to_T2_LPS.tfm",
+    "RawSources": [
+        "sub-228/anat/sub-228_T1w.nii.gz",
+        "sub-228/anat/sub-228_T2w.nii.gz"
+    ],
+    "SpatialReference": "sub-228/anat/sub-228_T2w.nii.gz"
+}

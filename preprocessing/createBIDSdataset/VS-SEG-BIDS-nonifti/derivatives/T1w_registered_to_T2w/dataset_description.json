@@ -1,0 +1,19 @@
+{
+    "Name": "T1w_registered_to_T2w",
+    "BIDSVersion": "1.6.0",
+    "DatasetType": "derivative",
+    "GeneratedBy": [
+        {
+            "Name": "3DSlicer with python script: https://github.com/KCL-BMEIS/VS_Seg/tree/master/preprocessing/createBIDSdataset/data_conversion_BIDS.py",
+            "Description": "T1w images co-registered to their corresponding T2w images and resampled at the T2w grid points."
+        }
+    ],
+    "SourceDatasets": [
+        {
+            "URL": "file://../../../VS_SEG_BIDS"
+        },
+        {
+            "URL": "file://../../../VS_SEG_BIDS/sourcedata/registration_matrices"
+        }
+    ]
+}

@@ -1,0 +1,29 @@
+{
+    "Name": "Segmentation of Vestibular Schwannoma from Magnetic Resonance Imaging: An Open Annotated Dataset and Baseline Algorithm (Vestibular-Schwannoma-SEG)",
+    "BIDSVersion": "1.6.0",
+    "DatasetType": "raw",
+    "License": "TCIA Data Usage Policy and the Creative Commons Attribution 4.0 International License",
+    "Authors": [
+        "Shapey, J.",
+        "Kujawa, A.",
+        "Dorent, R.",
+        "Wang, G.",
+        "Bisdas, S.",
+        "Dimitriadis, A.",
+        "Grishchuck, D.",
+        "Paddick, I.",
+        "Kitchen, N.",
+        "Bradford, R.",
+        "Saeed, S.",
+        "Ourselin, S.",
+        "Vercauteren, T."
+    ],
+    "Acknowledgements": "This work was supported by Wellcome Trust (203145Z/16/Z, 203148/Z/16/Z, WT106882), EPSRC (NS/A000050/1, NS/A000049/1) and MRC (MC_PC_180520) funding. Tom Vercauteren is also supported by a Medtronic/Royal Academy of Engineering Research Chair (RCSRF1819\\7\\34).",
+    "HowToAcknowledge": "Please cite the references under the ReferencesAndLinks key.",
+    "ReferencesAndLinks": [
+        "Shapey, J., Kujawa, A., Dorent, R., Wang, G., Bisdas, S., Dimitriadis, A., Grishchuck, D., Paddick, I., Kitchen, N., Bradford, R., Saeed, S., Ourselin, S., & Vercauteren, T. (2021). Segmentation of Vestibular Schwannoma from Magnetic Resonance Imaging: An Open Annotated Dataset and Baseline Algorithm [Data set]. The Cancer Imaging Archive. https://doi.org/10.7937/TCIA.9YTJ-5Q73",
+        "Shapey, J., Wang, G., Dorent, R., Dimitriadis, A., Li, W., Paddick, I., Kitchen, N., Bisdas, S., Saeed, S. R., Ourselin, S., Bradford, R., & Vercauteren, T. (2021). An artificial intelligence framework for automatic segmentation and volumetry of vestibular schwannomas from contrast-enhanced T1-weighted and high-resolution T2-weighted MRI. Journal of Neurosurgery, 134(1), 171\u2013179. https://doi.org/10.3171/2019.9.jns191949",
+        "Clark, K., Vendt, B., Smith, K., Freymann, J., Kirby, J., Koppel, P., Moore, S., Phillips, S., Maffitt, D., Pringle, M., Tarbox, L., & Prior, F. (2013). The Cancer Imaging Archive (TCIA): Maintaining and Operating a Public Information Repository. Journal of Digital Imaging, 26(6), 1045\u20131057. https://doi.org/10.1007/s10278-013-9622-7"
+    ],
+    "DatasetDOI": "https://doi.org/10.1007/s10278-013-9622-7"
+}

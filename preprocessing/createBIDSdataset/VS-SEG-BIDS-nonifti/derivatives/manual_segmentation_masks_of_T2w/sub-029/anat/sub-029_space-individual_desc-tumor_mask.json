@@ -1,0 +1,10 @@
+{
+    "Description": "Manually created mask of the Vestibular Schwannoma based on both T1w and T2w image. The binary mask was derived from contour points and discretized by 3DSlicer.",
+    "Manual": true,
+    "Sources": "sourcedata/contours/sub-029/anat/sub-029_contours_space-individual_T2w.json",
+    "RawSources": [
+        "sub-029/anat/sub-029_T1w.nii.gz",
+        "sub-029/anat/sub-029_T2w.nii.gz"
+    ],
+    "SpatialReference": "sub-029/anat/sub-029_T2w.nii.gz"
+}
