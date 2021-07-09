@@ -4,26 +4,14 @@ Adapted from: https://github.com/SlicerRt/SlicerRT/edit/master/BatchProcessing/B
 
 usage from command line:
 [path_slicer] --python-script [path_to_this_python_file] --input-folder [path_input] --output-folder [path_output]
-[optional] --register [T1 or T2] --export_all_structures
+[optional] --no_nifti
 
 description:
 --input-folder [path_input] ... path_input is a path to a folder containing sub-folders named vs_gk_<case_number>_t1
                                 and vs_gk_<case_number>_t2, which contain image files in DICOM format and the
                                 contours.json file
---register ... optional keyword:
-                if not used, no registration will be performed. The T1 and T2 image will be exported as
-                vs_gk_t1_refT1.nii.gz and vs_gk_t2_refT2.nii.gz . The tumour segmentations will be exported as
-                vs_gk_seg_refT1.nii.gz with the dimensions of the T1 image and vs_gk_seg_refT2.nii.gz with the
-                dimensions of the T2 image.
-
-                --register T1: The T2 image will be registered to the T1 image. The exported image files will be named
-                vs_gk_t1_refT1.nii.gz and vs_gk_t1_refT1.nii.gz. Only one segmentation with the dimensions of the T1
-                image will be exported, named vs_gk_seg_refT1.nii.gz
-
-                --register T2: The T1 image will be registered to the T2 image. The exported image files will be named
-                vs_gk_t1_refT2.nii.gz and vs_gk_t1_refT2.nii.gz. Only one segmentation with the dimensions of the T2
-                image will be exported, named vs_gk_seg_refT2.nii.gz
-
+--no_nifti ... optional keyword: if used, nifti files will not be saved to the BIDS folder, but all other files will
+                                 be saved
 --export_all_structures ... optional keyword: if used, all structures in the contours.json file will be exported, not
                             only the tumour. The exported structures will be named
                             vs_gk_struc<structure_index>_<structure_name>_refT1.nii.gz and
@@ -52,7 +40,7 @@ import json
 import numpy as np
 import shutil
 import pydicom
-
+import csv
 
 def loadCheckedLoadables(self):
     # method copied from https://github.com/Slicer/Slicer/blob/b3a78b1cf7cbe6e832ffe6b149bec39d9539f4c6/Modules/
@@ -329,6 +317,8 @@ def createBIDSPath(BIDSRootFolderPath, case, folderID):
     elif folderID == "raw_description_json":
         # path to raw dataset_description.json
         path = os.path.join(BIDSRootFolderPath, "dataset_description.json")
+    elif folderID == "participants_tsv":
+        path = os.path.join(BIDSRootFolderPath, "participants.tsv")
     elif folderID == "raw_sub_anat_T1w_nii":
         # path to nifti file in that folder
         path = os.path.join(BIDSRootFolderPath, subject_entity, "anat", subject_entity + "_T1w.nii.gz")
@@ -384,7 +374,7 @@ def createBIDSPath(BIDSRootFolderPath, case, folderID):
         raise Exception("folderID does not exist.")
 
     # if the paths are folder-paths, create the folders, if they are file-paths create the containing folders
-    if not any(ext in path for ext in [".nii.gz", ".json", ".tfm", "README"]):
+    if not any(ext in path for ext in [".nii.gz", ".json", ".tfm", "README", ".tsv"]):
         os.makedirs(path, exist_ok=True)
     else:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -482,7 +472,7 @@ def main(argv):
 
 
     ## create README
-    readme_content = "###Segmentation of Vestibular Schwannoma from Magnetic Resonance Imaging: An Open Annotated " \
+    readme_content = "#Segmentation of Vestibular Schwannoma from Magnetic Resonance Imaging: An Open Annotated " \
                      "Dataset and Baseline Algorithm (Vestibular-Schwannoma-SEG)\n\n"\
                      "This collection contains a labeled dataset of MRI images collected on 242 consecutive patients " \
                      "with vestibular schwannoma (VS) undergoing Gamma Knife stereotactic radiosurgery (GK SRS). " \
@@ -526,6 +516,255 @@ def main(argv):
 
     with open(createBIDSPath(output_folder, case=-1, folderID="raw_README"), 'w') as f:
         f.write(readme_content)
+
+    ## create participants.tsv
+
+    with open(createBIDSPath(output_folder, case=-1, folderID="participants_tsv"), 'w', newline='') as file:
+        writer = csv.writer(file, delimiter="\t")
+
+        writer.writerow(["participant", "age", "sex"])
+        writer.writerow([1, 60, "M"])
+        writer.writerow([2, 56, "M"])
+        writer.writerow([3, 56, "F"])
+        writer.writerow([4, 41, "F"])
+        writer.writerow([5, 44, "M"])
+        writer.writerow([6, 53, "F"])
+        writer.writerow([7, 66, "F"])
+        writer.writerow([8, 75, "M"])
+        writer.writerow([9, 69, "M"])
+        writer.writerow([10, 70, "M"])
+        writer.writerow([11, 51, "M"])
+        writer.writerow([12, 32, "M"])
+        writer.writerow([13, 66, "M"])
+        writer.writerow([14, 50, "F"])
+        writer.writerow([15, 57, "F"])
+        writer.writerow([16, 84, "F"])
+        writer.writerow([17, 71, "M"])
+        writer.writerow([18, 42, "M"])
+        writer.writerow([19, 34, "F"])
+        writer.writerow([20, 58, "M"])
+        writer.writerow([21, 61, "F"])
+        writer.writerow([22, 65, "F"])
+        writer.writerow([23, 63, "F"])
+        writer.writerow([24, 36, "M"])
+        writer.writerow([25, 54, "M"])
+        writer.writerow([26, 37, "M"])
+        writer.writerow([27, 47, "M"])
+        writer.writerow([28, 50, "F"])
+        writer.writerow([29, 51, "F"])
+        writer.writerow([30, 63, "F"])
+        writer.writerow([31, 57, "F"])
+        writer.writerow([32, 52, "F"])
+        writer.writerow([33, 45, "F"])
+        writer.writerow([34, 66, "F"])
+        writer.writerow([35, 76, "F"])
+        writer.writerow([36, 52, "F"])
+        writer.writerow([37, 65, "M"])
+        writer.writerow([38, 75, "F"])
+        writer.writerow([40, 59, "F"])
+        writer.writerow([41, 59, "F"])
+        writer.writerow([42, 67, "F"])
+        writer.writerow([43, 48, "F"])
+        writer.writerow([44, 54, "M"])
+        writer.writerow([45, 74, "M"])
+        writer.writerow([46, 69, "M"])
+        writer.writerow([47, 28, "F"])
+        writer.writerow([48, 65, "M"])
+        writer.writerow([49, 50, "M"])
+        writer.writerow([50, 67, "M"])
+        writer.writerow([51, 64, "F"])
+        writer.writerow([52, 29, "F"])
+        writer.writerow([53, 62, "M"])
+        writer.writerow([54, 33, "F"])
+        writer.writerow([55, 39, "F"])
+        writer.writerow([56, 68, "M"])
+        writer.writerow([57, 53, "F"])
+        writer.writerow([58, 62, "M"])
+        writer.writerow([59, 59, "F"])
+        writer.writerow([60, 70, "F"])
+        writer.writerow([61, 78, "F"])
+        writer.writerow([62, 25, "F"])
+        writer.writerow([63, 36, "F"])
+        writer.writerow([64, 62, "F"])
+        writer.writerow([65, 67, "M"])
+        writer.writerow([66, 48, "F"])
+        writer.writerow([67, 62, "F"])
+        writer.writerow([68, 63, "F"])
+        writer.writerow([69, 55, "M"])
+        writer.writerow([70, 42, "F"])
+        writer.writerow([71, 48, "F"])
+        writer.writerow([72, 55, "M"])
+        writer.writerow([73, 68, "F"])
+        writer.writerow([74, 45, "F"])
+        writer.writerow([75, 27, "F"])
+        writer.writerow([76, 35, "F"])
+        writer.writerow([77, 65, "F"])
+        writer.writerow([78, 69, "F"])
+        writer.writerow([79, 66, "F"])
+        writer.writerow([80, 62, "F"])
+        writer.writerow([81, 51, "M"])
+        writer.writerow([82, 75, "F"])
+        writer.writerow([83, 66, "F"])
+        writer.writerow([84, 69, "F"])
+        writer.writerow([85, 47, "M"])
+        writer.writerow([86, 48, "F"])
+        writer.writerow([87, 71, "F"])
+        writer.writerow([88, 40, "M"])
+        writer.writerow([89, 31, "F"])
+        writer.writerow([90, 69, "M"])
+        writer.writerow([91, 39, "F"])
+        writer.writerow([92, 51, "F"])
+        writer.writerow([93, 56, "F"])
+        writer.writerow([94, 69, "M"])
+        writer.writerow([95, 73, "F"])
+        writer.writerow([96, 28, "F"])
+        writer.writerow([98, 67, "F"])
+        writer.writerow([99, 64, "F"])
+        writer.writerow([100, 40, "F"])
+        writer.writerow([101, 48, "F"])
+        writer.writerow([102, 68, "F"])
+        writer.writerow([103, 64, "F"])
+        writer.writerow([104, 51, "M"])
+        writer.writerow([105, 54, "F"])
+        writer.writerow([106, 52, "M"])
+        writer.writerow([107, 77, "F"])
+        writer.writerow([108, 42, "F"])
+        writer.writerow([109, 43, "F"])
+        writer.writerow([110, 55, "F"])
+        writer.writerow([111, 54, "F"])
+        writer.writerow([112, 67, "F"])
+        writer.writerow([113, 51, "M"])
+        writer.writerow([114, 67, "M"])
+        writer.writerow([115, 56, "M"])
+        writer.writerow([116, 40, "M"])
+        writer.writerow([117, 83, "M"])
+        writer.writerow([118, 72, "F"])
+        writer.writerow([119, 68, "F"])
+        writer.writerow([120, 58, "F"])
+        writer.writerow([121, 60, "F"])
+        writer.writerow([122, 49, "F"])
+        writer.writerow([123, 63, "M"])
+        writer.writerow([124, 48, "M"])
+        writer.writerow([125, 64, "M"])
+        writer.writerow([126, 78, "F"])
+        writer.writerow([127, 33, "M"])
+        writer.writerow([128, 63, "F"])
+        writer.writerow([129, 46, "F"])
+        writer.writerow([131, 57, "F"])
+        writer.writerow([132, 68, "M"])
+        writer.writerow([133, 46, "F"])
+        writer.writerow([134, 65, "F"])
+        writer.writerow([135, 57, "M"])
+        writer.writerow([136, 81, "M"])
+        writer.writerow([137, 39, "F"])
+        writer.writerow([138, 54, "F"])
+        writer.writerow([139, 68, "F"])
+        writer.writerow([140, 60, "M"])
+        writer.writerow([141, 54, "F"])
+        writer.writerow([142, 84, "M"])
+        writer.writerow([143, 53, "M"])
+        writer.writerow([144, 74, "F"])
+        writer.writerow([145, 52, "M"])
+        writer.writerow([146, 74, "F"])
+        writer.writerow([147, 60, "F"])
+        writer.writerow([148, 51, "F"])
+        writer.writerow([149, 64, "F"])
+        writer.writerow([150, 43, "M"])
+        writer.writerow([151, 54, "F"])
+        writer.writerow([152, 68, "M"])
+        writer.writerow([153, 63, "F"])
+        writer.writerow([154, 34, "M"])
+        writer.writerow([155, 46, "M"])
+        writer.writerow([156, 48, "F"])
+        writer.writerow([157, 56, "F"])
+        writer.writerow([158, 39, "F"])
+        writer.writerow([159, 61, "M"])
+        writer.writerow([161, 43, "F"])
+        writer.writerow([162, 75, "F"])
+        writer.writerow([163, 54, "F"])
+        writer.writerow([164, 54, "F"])
+        writer.writerow([165, 54, "F"])
+        writer.writerow([166, 63, "F"])
+        writer.writerow([167, 44, "M"])
+        writer.writerow([169, 52, "M"])
+        writer.writerow([170, 58, "F"])
+        writer.writerow([171, 46, "F"])
+        writer.writerow([172, 50, "M"])
+        writer.writerow([173, 58, "M"])
+        writer.writerow([174, 68, "M"])
+        writer.writerow([175, 54, "F"])
+        writer.writerow([176, 67, "M"])
+        writer.writerow([177, 32, "M"])
+        writer.writerow([178, 58, "F"])
+        writer.writerow([179, 56, "M"])
+        writer.writerow([180, 73, "F"])
+        writer.writerow([181, 38, "F"])
+        writer.writerow([182, 47, "F"])
+        writer.writerow([183, 70, "F"])
+        writer.writerow([184, 70, "F"])
+        writer.writerow([185, 51, "F"])
+        writer.writerow([186, 73, "M"])
+        writer.writerow([187, 51, "M"])
+        writer.writerow([188, 54, "M"])
+        writer.writerow([189, 54, "M"])
+        writer.writerow([190, 58, "M"])
+        writer.writerow([191, 44, "F"])
+        writer.writerow([192, 63, "F"])
+        writer.writerow([193, 54, "F"])
+        writer.writerow([194, 37, "F"])
+        writer.writerow([195, 44, "M"])
+        writer.writerow([196, 62, "F"])
+        writer.writerow([197, 77, "M"])
+        writer.writerow([198, 62, "M"])
+        writer.writerow([199, 45, "F"])
+        writer.writerow([200, 75, "M"])
+        writer.writerow([201, 51, "F"])
+        writer.writerow([202, 37, "F"])
+        writer.writerow([203, 52, "F"])
+        writer.writerow([204, 38, "F"])
+        writer.writerow([205, 78, "M"])
+        writer.writerow([206, 57, "F"])
+        writer.writerow([207, 57, "M"])
+        writer.writerow([209, 37, "F"])
+        writer.writerow([210, 71, "F"])
+        writer.writerow([211, 43, "F"])
+        writer.writerow([212, 24, "F"])
+        writer.writerow([213, 51, "M"])
+        writer.writerow([214, 38, "F"])
+        writer.writerow([215, 63, "F"])
+        writer.writerow([216, 37, "F"])
+        writer.writerow([217, 36, "M"])
+        writer.writerow([218, 61, "M"])
+        writer.writerow([220, 61, "F"])
+        writer.writerow([221, 64, "M"])
+        writer.writerow([222, 65, "M"])
+        writer.writerow([223, 43, "M"])
+        writer.writerow([224, 60, "M"])
+        writer.writerow([225, 36, "M"])
+        writer.writerow([226, 52, "F"])
+        writer.writerow([228, 68, "M"])
+        writer.writerow([229, 51, "M"])
+        writer.writerow([230, 56, "F"])
+        writer.writerow([231, 46, "F"])
+        writer.writerow([232, 60, "F"])
+        writer.writerow([233, 43, "F"])
+        writer.writerow([234, 37, "M"])
+        writer.writerow([235, 60, "M"])
+        writer.writerow([236, 65, "M"])
+        writer.writerow([237, 70, "F"])
+        writer.writerow([238, 33, "F"])
+        writer.writerow([239, 41, "M"])
+        writer.writerow([240, 59, "F"])
+        writer.writerow([241, 47, "F"])
+        writer.writerow([242, 57, "F"])
+        writer.writerow([243, 59, "F"])
+        writer.writerow([244, 54, "M"])
+        writer.writerow([245, 50, "M"])
+        writer.writerow([246, 59, "M"])
+        writer.writerow([247, 33, "F"])
+        writer.writerow([248, 61, "F"])
+        writer.writerow([249, 55, "M"])
+        writer.writerow([250, 72, "M"])
 
     ## create dataset_description.json
 
@@ -925,7 +1164,6 @@ def main(argv):
 
         with open(createBIDSPath(output_folder, case_number, folderID="derivatives_masks_T2w_json"), 'w') as ff:
             json.dump(data_dict, ff, indent=4)
-
 
     sys.exit(0)
 
