@@ -156,6 +156,18 @@ on ground truth label) with ground truth label and predicted label
 
 Additionally, all output and error messages are logged in VS_Seg/inference_error_log.txt
 
+# Trained models
+Results folders containing trained models based on T1 or T2 inputs and detailed inference results can be found here: https://doi.org/10.5281/zenodo.6323472
+
+After downloading the folders and unzipping them, you can re-run inference with the following commands:
+
+`python3 VS_inference.py --results_folder_name $RESUlTS_FOLDER_NAME_T1 --dataset T1`
+
+`python3 VS_inference.py --results_folder_name $RESUlTS_FOLDER_NAME_T2 --dataset T2`
+
+ where $RESULTS_FOLDER_NAME_T1 and $RESULTS_FOLDER_NAME_T2 are the paths to the unzipped folders.
+
+
 # Using Tensorboard to monitor training progress
 The training algorithm will create a folder `runs` in the root folder and store the training progress data in it.
 If tensorboard is installed the following command can be used to monitor the training progress:
