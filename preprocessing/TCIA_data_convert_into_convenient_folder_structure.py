@@ -20,7 +20,7 @@ output_path = args.output
 if not os.path.isdir(output_path):
     os.makedirs(output_path, exist_ok=True)
 
-cases = natsorted(glob(os.path.join(input_path, '*')))
+cases = natsorted(glob(os.path.join(input_path, 'VS-SEG-*')))
 
 for case in cases:
     folders = glob(case+'/*/*')
