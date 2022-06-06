@@ -47,6 +47,7 @@ contours.json files into binary segmentations in NIFTI format, run the following
 
 where:
 * The 3DSlicer archive has been unpacked at <SLICER_DIR>.
+* The 3DSlicer software needs to run, and for that this documentation is helpful: https://slicer.readthedocs.io/en/latest/developer_guide/script_repository.html
 
 description:
 
