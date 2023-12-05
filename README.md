@@ -3,6 +3,8 @@
 This repository provides scripts for the segmentation of vestibular schwannoma on 3D T1 or T2 images, 
 based on the following papers:
 
+* Shapey, J. et al. Segmentation of vestibular schwannoma from MRI, an open annotated dataset and baseline algorithm. 
+Scientific Data, 8(1), p.286. https://doi.org/10.1038/s41597-021-01064-w
 * Wang, G. et al. Automatic Segmentation of Vestibular Schwannoma from T2-Weighted MRI by Deep 
 Spatial Attention with Hardness-Weighted Loss, MICCAI, pp 264-272, 2019.
 * Shapey, J. et al. An artificial intelligence framework for automatic segmentation and volumetry of vestibular 
@@ -16,7 +18,7 @@ The dataset described in these publications is publicly available in The Cancer 
 Shapey, J., Kujawa, A., Dorent, R., Wang, G., Bisdas, S., Dimitriadis, A., Grishchuck, D., Paddick, I., Kitchen, 
 N., Bradford, R., Saeed, S., Ourselin, S., & Vercauteren, T. (2021). Segmentation of Vestibular Schwannoma from 
 Magnetic Resonance Imaging: An Open Annotated Dataset and Baseline Algorithm [Data set]. The Cancer Imaging Archive. 
-https://doi.org/10.7937/TCIA.9YTJ-5Q73 
+https://doi.org/10.7937/TCIA.9YTJ-5Q73
 
 Note, that one subject (VS-SEG-168) had to be removed from the data set because the data was incomplete. 
 
