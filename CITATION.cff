@@ -13,8 +13,30 @@ type: dataset
 authors:
   - given-names: Jonathan
     family-names: Shapey
-    email: jonathan.shapey@kcl.ac.uk
-    affiliation: KCL
+  - given-names: Aaron
+    family-names: Kujawa
+  - given-names: Reuben
+    family-names: Dorent
+  - given-names: Guotai
+    family-names: Wang
+  - given-names: Alexis
+    family-names: Dimitriadis
+  - given-names: Diana
+    family-names: Grishchuk
+  - given-names: Ian
+    family-names: Paddick
+  - given-names: Neil
+    family-names: Kitchen
+  - given-names: Robert
+    family-names: Bradford
+  - given-names: Shakeel R.
+    family-names: Saeed
+  - given-names: Sotirios
+    family-names: Bisdas
+  - given-names: Sébastien
+    family-names: Ourselin
+  - given-names: Tom
+    family-names: Vercauteren
 identifiers:
   - type: doi
     value: 10.7937/TCIA.9YTJ-5Q73
